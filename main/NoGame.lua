@@ -979,6 +979,16 @@ do
         end)
     end)
 
+    Tabs.Universal:AddSection("Admin Commands")
+
+    Tabs.Universal:AddButton({
+        Title = "Execute NexsCmds (Universal Admin)",
+        Description = "Loads the powerful Universal Admin commands script.",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/NexsCmds/Menu/client.luau"))()
+        end
+    })
+
     Tabs.Universal:AddSection("Combat Utilities")
 
     Tabs.Universal:AddButton({
