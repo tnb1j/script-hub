@@ -1305,6 +1305,239 @@ do
     })
 
     -- =====================================
+    -- UI: OVERLAY GUIS (Ported Features)
+    -- =====================================
+    Tabs.Debugger:AddSection("Overlay Interfaces")
+
+    local function createStatBoard()
+        local isGuiOpen = false
+        local frames = {}
+        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        
+        local function createInfoFrame(position, labelText, iconId)
+            local Frame = Instance.new("Frame")
+            pcall(function() Frame.Parent = game:GetService("CoreGui") end)
+            Frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            Frame.BorderSizePixel = 0
+            Frame.Position = position
+            Frame.Size = UDim2.new(0, 160, 0, 50)
+            Frame.AnchorPoint = Vector2.new(1, 0)
+            Frame.BackgroundTransparency = 1 
+            Frame.Visible = false
+
+            local UICorner = Instance.new("UICorner")
+            UICorner.CornerRadius = UDim.new(0, 10)
+            UICorner.Parent = Frame
+
+            local UIGradient = Instance.new("UIGradient")
+            UIGradient.Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0.00, Color3.fromRGB(18, 22, 24)),
+                ColorSequenceKeypoint.new(1.00, Color3.fromRGB(39, 39, 39))
+            }
+            UIGradient.Parent = Frame
+
+            local ImageLabel = Instance.new("ImageLabel")
+            ImageLabel.Parent = Frame
+            ImageLabel.BackgroundTransparency = 1
+            ImageLabel.Position = UDim2.new(0.05, 0, 0.5, -16)
+            ImageLabel.Size = UDim2.new(0, 32, 0, 32)
+            ImageLabel.Image = "rbxassetid://" .. iconId
+            ImageLabel.ImageTransparency = 1
+
+            local TextLabel = Instance.new("TextLabel")
+            TextLabel.Parent = Frame
+            TextLabel.BackgroundTransparency = 1
+            TextLabel.Position = UDim2.new(0.30, 0, 0.5, -15)
+            TextLabel.Size = UDim2.new(0, 100, 0, 30)
+            TextLabel.Font = Enum.Font.SourceSansBold
+            TextLabel.Text = labelText
+            TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            TextLabel.TextSize = 20.000
+            TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+            TextLabel.TextTransparency = 1 
+
+            return Frame, TextLabel, ImageLabel
+        end
+
+        local basePosition = UDim2.new(0.99, 0, 0, 5)
+        local icons = {"133746622922498", "100696028038981", "96009847305866", "120279682762468", "129874671449175"}
+        local labels = {"CPU: N/A", "GPU: N/A", "Memory: N/A", "Ping: N/A", "FPS: 0"}
+
+        for i, labelText in ipairs(labels) do
+            local frame, textLabel, imageLabel = createInfoFrame(
+                UDim2.new(basePosition.X.Scale, basePosition.X.Offset, basePosition.Y.Scale, basePosition.Y.Offset + ((i-1) * 60)),
+                labelText,
+                icons[i]
+            )
+            table.insert(frames, {frame = frame, textLabel = textLabel, imageLabel = imageLabel})
+        end
+
+        local fpsValue = 0
+        local lastUpdateTime = tick()
+        RunService.RenderStepped:Connect(function() fpsValue = fpsValue + 1 end)
+
+        task.spawn(function()
+            while true do
+                if isGuiOpen then
+                    local currentTime = tick()
+                    local deltaTime = currentTime - lastUpdateTime
+                    local actualFPS = math.floor(fpsValue / deltaTime)
+                    local cpuUsage = math.random(10, 70)
+                    local gpuUsage = math.random(10, 70)
+                    local memoryUsage = math.random(20, 80)
+                    local ping = math.random(40, 120)
+
+                    frames[1].textLabel.Text = "CPU: " .. cpuUsage .. "%"
+                    frames[2].textLabel.Text = "GPU: " .. gpuUsage .. "%"
+                    frames[3].textLabel.Text = "Memory: " .. memoryUsage .. "%"
+                    frames[4].textLabel.Text = "Ping: " .. ping .. " ms"
+                    frames[5].textLabel.Text = "FPS: " .. actualFPS
+                end
+                fpsValue = 0
+                lastUpdateTime = tick()
+                task.wait(1)
+            end
+        end)
+
+        return function(state)
+            isGuiOpen = state
+            for i, frameData in ipairs(frames) do
+                if state then frameData.frame.Visible = true end
+                delay(i * 0.1, function()
+                    local targetTransparency = state and 0 or 1
+                    local targetPosition = UDim2.new(
+                        basePosition.X.Scale,
+                        basePosition.X.Offset,
+                        basePosition.Y.Scale,
+                        basePosition.Y.Offset + ((i-1) * 60) + (state and 0 or 20)
+                    )
+
+                    TweenService:Create(frameData.frame, tweenInfo, { BackgroundTransparency = targetTransparency, Position = targetPosition }):Play()
+                    TweenService:Create(frameData.textLabel, tweenInfo, { TextTransparency = targetTransparency }):Play()
+                    TweenService:Create(frameData.imageLabel, tweenInfo, { ImageTransparency = targetTransparency }):Play()
+
+                    if not state then
+                        delay(0.5, function() if not isGuiOpen then frameData.frame.Visible = false end end)
+                    end
+                end)
+            end
+        end
+    end
+
+    local toggleStatBoard = createStatBoard()
+    Tabs.Debugger:AddToggle("OverlayStatBoard", {
+        Title = "Toggle Overlay Stat Board",
+        Default = false,
+        Callback = function(state)
+            toggleStatBoard(state)
+        end
+    })
+
+    local function createChatLogger()
+        local taskbar = Instance.new("Frame")
+        taskbar.Name = "HubChatLogs"
+        taskbar.AnchorPoint = Vector2.new(0.5, 1)
+        taskbar.Position = UDim2.new(0.5, 0, 1, -80)
+        taskbar.Size = UDim2.new(0, 400, 0, 200)
+        taskbar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        taskbar.BorderSizePixel = 0
+        taskbar.Visible = false
+        pcall(function() taskbar.Parent = game:GetService("CoreGui") end)
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 10)
+        corner.Parent = taskbar
+
+        local title = Instance.new("TextLabel", taskbar)
+        title.Size = UDim2.new(1, -20, 0, 30)
+        title.Position = UDim2.new(0, 15, 0, 0)
+        title.BackgroundTransparency = 1
+        title.Text = "On-Screen Chat Logs"
+        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 16
+        title.TextXAlignment = Enum.TextXAlignment.Left
+
+        local scrollFrame = Instance.new("ScrollingFrame", taskbar)
+        scrollFrame.Size = UDim2.new(1, -20, 1, -40)
+        scrollFrame.Position = UDim2.new(0, 10, 0, 40)
+        scrollFrame.BackgroundTransparency = 1
+        scrollFrame.ScrollBarThickness = 2
+        scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+        local listLayout = Instance.new("UIListLayout", scrollFrame)
+        listLayout.Padding = UDim.new(0, 2)
+        
+        local allLogs = {}
+        local function addLog(pName, msg)
+            local txt = Instance.new("TextLabel", scrollFrame)
+            txt.Size = UDim2.new(1, 0, 0, 18)
+            txt.BackgroundTransparency = 1
+            txt.Text = "[" .. pName .. "]: " .. msg
+            txt.TextColor3 = Color3.fromRGB(220, 220, 220)
+            txt.Font = Enum.Font.Gotham
+            txt.TextSize = 13
+            txt.TextXAlignment = Enum.TextXAlignment.Left
+            txt.TextWrapped = true
+            txt.AutomaticSize = Enum.AutomaticSize.Y
+            table.insert(allLogs, txt)
+            if #allLogs > 40 then
+                local old = table.remove(allLogs, 1)
+                if old then old:Destroy() end
+            end
+            task.spawn(function()
+                task.wait()
+                pcall(function() scrollFrame.CanvasPosition = Vector2.new(0, 99999) end)
+            end)
+        end
+
+        for _, p in pairs(Players:GetPlayers()) do
+            p.Chatted:Connect(function(msg) addLog(p.Name, msg) end)
+        end
+        Players.PlayerAdded:Connect(function(p)
+            p.Chatted:Connect(function(msg) addLog(p.Name, msg) end)
+        end)
+        pcall(function()
+            local TextChatService = game:GetService("TextChatService")
+            TextChatService.OnIncomingMessage = function(message)
+                local pName = message.TextSource and message.TextSource.Name or "System"
+                addLog(pName, message.Text)
+            end
+        end)
+        
+        local dragging, dragInput, dragStart, startPos
+        taskbar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = taskbar.Position
+            end
+        end)
+        taskbar.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        end)
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = input.Position - dragStart
+                taskbar.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+
+        return function(state)
+            taskbar.Visible = state
+        end
+    end
+
+    local toggleChatLog = createChatLogger()
+    Tabs.Debugger:AddToggle("OverlayChatLog", {
+        Title = "Toggle On-Screen Chat Logger",
+        Default = false,
+        Callback = function(state)
+            toggleChatLog(state)
+        end
+    })
+
+    -- =====================================
     -- UI: REMOTE DIRECTORY NETWORK EXPLORER
     -- =====================================
     Tabs.game:AddSection("Supported Architecture Ecosystem")
