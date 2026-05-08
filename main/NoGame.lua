@@ -191,7 +191,7 @@ do
                 Title = "Confirm Reversion",
                 Content = "Are you sure you want to revert modifications back to structural baseline properties?",
                 Buttons = {
-                    { Title = "Confirm", Callback = function() pcall(function() player.Character.Humanoid.WalkSpeed = 16 end) end },
+                    { Title = "Confirm", Callback = function() pcall(function() player.Character.Humanoid.WalkSpeed = 16 end) Options.WalkSpeedSlider:SetValue(16) end },
                     { Title = "Cancel" }
                 }
             })
@@ -215,13 +215,151 @@ do
                 Title = "Confirm Reversion",
                 Content = "Are you sure you want to revert physics modifications back to standard engine metrics?",
                 Buttons = {
-                    { Title = "Confirm", Callback = function() pcall(function() player.Character.Humanoid.JumpPower = 50 end) end },
+                    { Title = "Confirm", Callback = function() pcall(function() player.Character.Humanoid.JumpPower = 50 end) Options.JumpPowerSlider:SetValue(50) end },
                     { Title = "Cancel" }
                 }
             })
         end
     })
-    
+
+    -- =====================================
+    -- UI: SELF MODIFICATIONS
+    -- =====================================
+    Tabs.Script:AddSection("Self Modifications")
+
+    do
+        local noclipConn = nil
+        local NoclipToggle = Tabs.Script:AddToggle("Noclip_Toggle", { Title = "Noclip (No Collision)", Default = false })
+        NoclipToggle:OnChanged(function()
+            if Options.Noclip_Toggle.Value then
+                noclipConn = RunService.Stepped:Connect(function()
+                    if player.Character then
+                        for _, p in pairs(player.Character:GetDescendants()) do
+                            if p:IsA("BasePart") then p.CanCollide = false end
+                        end
+                    end
+                end)
+            else
+                if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
+                pcall(function()
+                    for _, p in pairs(player.Character:GetDescendants()) do
+                        if p:IsA("BasePart") then p.CanCollide = true end
+                    end
+                end)
+            end
+        end)
+    end
+
+    do
+        local flyConn = nil
+        local FlyToggle = Tabs.Script:AddToggle("Fly_Toggle", { Title = "Fly Mode (WASD + Space/Shift)", Default = false })
+        FlyToggle:OnChanged(function()
+            local char = player.Character
+            if not char then return end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if Options.Fly_Toggle.Value then
+                if not hrp or not hum then return end
+                hum.PlatformStand = true
+                local bv = Instance.new("BodyVelocity")
+                bv.Name = "_HubFlyBV"; bv.MaxForce = Vector3.new(1e9,1e9,1e9); bv.Velocity = Vector3.zero; bv.Parent = hrp
+                local bg = Instance.new("BodyGyro")
+                bg.Name = "_HubFlyBG"; bg.MaxTorque = Vector3.new(1e9,1e9,1e9); bg.P = 9e4; bg.CFrame = hrp.CFrame; bg.Parent = hrp
+                local UIS2 = game:GetService("UserInputService")
+                local cam = workspace.CurrentCamera
+                flyConn = RunService.RenderStepped:Connect(function()
+                    if not Options.Fly_Toggle.Value then return end
+                    local mv = Vector3.zero
+                    if UIS2:IsKeyDown(Enum.KeyCode.W) then mv += cam.CFrame.LookVector end
+                    if UIS2:IsKeyDown(Enum.KeyCode.S) then mv -= cam.CFrame.LookVector end
+                    if UIS2:IsKeyDown(Enum.KeyCode.A) then mv -= cam.CFrame.RightVector end
+                    if UIS2:IsKeyDown(Enum.KeyCode.D) then mv += cam.CFrame.RightVector end
+                    if UIS2:IsKeyDown(Enum.KeyCode.Space) then mv += Vector3.new(0,1,0) end
+                    if UIS2:IsKeyDown(Enum.KeyCode.LeftShift) then mv -= Vector3.new(0,1,0) end
+                    bv.Velocity = (mv.Magnitude > 0 and mv.Unit or mv) * 60
+                    bg.CFrame = cam.CFrame
+                end)
+            else
+                if flyConn then flyConn:Disconnect(); flyConn = nil end
+                if hrp then
+                    pcall(function() hrp._HubFlyBV:Destroy() end)
+                    pcall(function() hrp._HubFlyBG:Destroy() end)
+                end
+                if hum then hum.PlatformStand = false end
+            end
+        end)
+    end
+
+    do
+        local godConn = nil
+        local GodToggle = Tabs.Script:AddToggle("GodMode_Toggle", { Title = "God Mode (Infinite Health)", Default = false })
+        GodToggle:OnChanged(function()
+            if Options.GodMode_Toggle.Value then
+                godConn = RunService.Heartbeat:Connect(function()
+                    pcall(function()
+                        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then hum.Health = hum.MaxHealth end
+                    end)
+                end)
+            else
+                if godConn then godConn:Disconnect(); godConn = nil end
+            end
+        end)
+    end
+
+    do
+        local ijConn = nil
+        local IJToggle = Tabs.Script:AddToggle("InfJump_Toggle", { Title = "Infinite Jump", Default = false })
+        IJToggle:OnChanged(function()
+            if Options.InfJump_Toggle.Value then
+                ijConn = game:GetService("UserInputService").JumpRequest:Connect(function()
+                    pcall(function()
+                        player.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+                    end)
+                end)
+            else
+                if ijConn then ijConn:Disconnect(); ijConn = nil end
+            end
+        end)
+    end
+
+    Tabs.Script:AddButton({
+        Title = "Reset Character",
+        Description = "Kills and respawns your character immediately.",
+        Callback = function()
+            pcall(function() player.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Dead) end)
+        end
+    })
+
+    Tabs.Script:AddButton({
+        Title = "Teleport to Spawn",
+        Description = "Moves your character to the map's spawn location.",
+        Callback = function()
+            pcall(function()
+                local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp and spawn then
+                    hrp.CFrame = spawn.CFrame + Vector3.new(0, 5, 0)
+                elseif hrp then
+                    hrp.CFrame = CFrame.new(0, 10, 0)
+                end
+            end)
+        end
+    })
+
+    Tabs.Script:AddButton({
+        Title = "Rejoin Server",
+        Description = "Reconnects to the current game server.",
+        Callback = function()
+            local TS = game:GetService("TeleportService")
+            if #Players:GetPlayers() <= 1 then
+                TS:Teleport(game.PlaceId, player)
+            else
+                pcall(function() TS:TeleportToPlaceInstance(game.PlaceId, game.JobId, player) end)
+            end
+        end
+    })
+
     local Toggle = Tabs.Script:AddToggle("AntiAFK_Hook", {Title = "State Lock (Anti-AFK)", Default = false})
     Toggle:OnChanged(function()
         getgenv().AntiAFKEnabled = Options.AntiAFK_Hook.Value
@@ -502,6 +640,14 @@ do
         Description = "Generates and teleports you to a private server in the current game.",
         Callback = function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Privateserver.lua"))()
+        end
+    })
+
+    Tabs.Universal:AddButton({
+        Title = "Launch gokuthug1 Advanced UI",
+        Description = "Full custom UI: Marketplace & Remote listener, Console, Fly, Rejoin, and more.",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/gokuthug1-ui.lua"))()
         end
     })
 
