@@ -887,51 +887,87 @@ do
     -- =====================================
     -- UI: EXECUTOR TAB
     -- =====================================
-    Tabs.Executor:AddSection("Console / LogService Output")
+    -- =====================================
+    -- UI: EXECUTOR TAB
+    -- =====================================
+    local ExecutorFrame = Instance.new("Frame")
+    ExecutorFrame.Size = UDim2.new(1, -10, 0, 360) -- Takes up almost all the space
+    ExecutorFrame.BackgroundTransparency = 1
+    
+    local CodeBox = Instance.new("TextBox")
+    CodeBox.Size = UDim2.new(1, 0, 1, -40)
+    CodeBox.Position = UDim2.new(0, 0, 0, 0)
+    CodeBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    CodeBox.TextColor3 = Color3.fromRGB(230, 230, 230)
+    CodeBox.Font = Enum.Font.Code
+    CodeBox.TextSize = 14
+    CodeBox.TextXAlignment = Enum.TextXAlignment.Left
+    CodeBox.TextYAlignment = Enum.TextYAlignment.Top
+    CodeBox.MultiLine = true
+    CodeBox.ClearTextOnFocus = false
+    CodeBox.Text = "-- Write Lua script here..."
+    CodeBox.Parent = ExecutorFrame
+    local uic = Instance.new("UICorner", CodeBox)
+    uic.CornerRadius = UDim.new(0, 6)
+    local stroke = Instance.new("UIStroke", CodeBox)
+    stroke.Color = Color3.fromRGB(60, 60, 65)
 
-    local LogParagraph = Tabs.Executor:AddParagraph({ Title = "Game Logs", Content = "Waiting for logs..." })
-    getgenv().HubGameLogs = {}
-
-    local LogService = game:GetService("LogService")
-    LogService.MessageOut:Connect(function(msg, mtype)
-        table.insert(getgenv().HubGameLogs, 1, os.date("[%H:%M:%S] ") .. msg)
-        if #getgenv().HubGameLogs > 25 then table.remove(getgenv().HubGameLogs, 26) end
-        pcall(function() LogParagraph:SetDesc(table.concat(getgenv().HubGameLogs, "\n")) end)
+    local ExecBtn = Instance.new("TextButton")
+    ExecBtn.Size = UDim2.new(0.48, 0, 0, 30)
+    ExecBtn.Position = UDim2.new(0, 0, 1, -30)
+    ExecBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    ExecBtn.Text = "Execute"
+    ExecBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ExecBtn.Font = Enum.Font.GothamBold
+    ExecBtn.TextSize = 14
+    ExecBtn.Parent = ExecutorFrame
+    local uic2 = Instance.new("UICorner", ExecBtn)
+    uic2.CornerRadius = UDim.new(0, 6)
+    
+    local ClearBtn = Instance.new("TextButton")
+    ClearBtn.Size = UDim2.new(0.48, 0, 0, 30)
+    ClearBtn.Position = UDim2.new(0.52, 0, 1, -30)
+    ClearBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    ClearBtn.Text = "Clear"
+    ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ClearBtn.Font = Enum.Font.GothamBold
+    ClearBtn.TextSize = 14
+    ClearBtn.Parent = ExecutorFrame
+    local uic3 = Instance.new("UICorner", ClearBtn)
+    uic3.CornerRadius = UDim.new(0, 6)
+    
+    ExecBtn.MouseButton1Click:Connect(function()
+        local code = CodeBox.Text
+        if code == "" or code == "-- Write Lua script here..." then return end
+        local fn, err = loadstring(code)
+        if fn then
+            local ok, res = pcall(fn)
+            if not ok then warn("Execute Error: " .. tostring(res)) end
+        else
+            warn("Syntax Error: " .. tostring(err))
+        end
+    end)
+    
+    ClearBtn.MouseButton1Click:Connect(function()
+        CodeBox.Text = ""
     end)
 
-    Tabs.Executor:AddButton({
-        Title = "Clear Logs",
-        Callback = function()
-            getgenv().HubGameLogs = {}
-            pcall(function() LogParagraph:SetDesc("Waiting for logs...") end)
-        end
-    })
-
-    local LuaInput = ""
-    Tabs.Executor:AddInput("LuaConsole_Input", {
-        Title = "Lua Executor",
-        Default = "",
-        Placeholder = "print('Hello')",
-        Numeric = false,
-        Finished = false,
-        Callback = function(Value)
-            LuaInput = Value
-        end
-    })
-
-    Tabs.Executor:AddButton({
-        Title = "Execute Code",
-        Callback = function()
-            if LuaInput == "" then return end
-            local fn, err = loadstring(LuaInput)
-            if fn then
-                local ok, res = pcall(fn)
-                if not ok then warn("Execute Error: " .. tostring(res)) end
+    -- Inject into Fluent UI tab
+    local tempPara = Tabs.Executor:AddParagraph({ Title = "Loading Executor...", Content = "" })
+    task.spawn(function()
+        task.wait()
+        pcall(function()
+            local uiParent = tempPara.Frame and tempPara.Frame.Parent
+            if uiParent then
+                ExecutorFrame.Parent = uiParent
+                tempPara.Frame:Destroy()
             else
-                warn("Syntax Error: " .. tostring(err))
+                if type(Tabs.Executor) == "table" and Tabs.Executor.Container then
+                    ExecutorFrame.Parent = Tabs.Executor.Container
+                end
             end
-        end
-    })
+        end)
+    end)
 
     Tabs.Universal:AddSection("Combat Utilities")
 
