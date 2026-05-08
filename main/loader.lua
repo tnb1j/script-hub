@@ -1,4 +1,5 @@
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+getgenv()._FluentLib = Fluent
 local HttpService = game:GetService("HttpService")
 local PlaceId = game.PlaceId
 local Request = request or http_request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request)

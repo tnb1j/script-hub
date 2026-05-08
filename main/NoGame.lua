@@ -1,4 +1,4 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local Fluent = getgenv()._FluentLib or loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
@@ -12,6 +12,7 @@ local AccountAge = player.AccountAge
 local hasPremium = player.MembershipType == Enum.MembershipType.Premium
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local Request = request or http_request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request)
 
 local REPO_OWNER = "tnb1j"
@@ -96,6 +97,7 @@ if getgenv().GameName then
 else
     Tabs = {
         Main = Window:AddTab({ Title = "Main", Icon = "info" }),
+        Update = Window:AddTab({ Title = "Update", Icon = "upload" }),
         Gameworks = Window:AddTab({ Title = "Unknown Game", Icon = "gamepad-2" }),
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
         Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
@@ -430,18 +432,7 @@ do
         end)
     end
 
-    Tabs.Script:AddButton({
-        Title = "Rejoin Server",
-        Description = "Reconnects to the current server instance.",
-        Callback = function()
-            local TS = game:GetService("TeleportService")
-            if #Players:GetPlayers() <= 1 then
-                TS:Teleport(game.PlaceId, player)
-            else
-                pcall(function() TS:TeleportToPlaceInstance(game.PlaceId, game.JobId, player) end)
-            end
-        end
-    })
+
 
     Tabs.Script:AddSection("Universal Hitbox Expander")
     Tabs.Script:AddParagraph({
@@ -887,9 +878,6 @@ do
     -- =====================================
     -- UI: EXECUTOR TAB
     -- =====================================
-    -- =====================================
-    -- UI: EXECUTOR TAB
-    -- =====================================
     local ExecutorFrame = Instance.new("Frame")
     ExecutorFrame.Size = UDim2.new(1, -10, 0, 360) -- Takes up almost all the space
     ExecutorFrame.BackgroundTransparency = 1
@@ -979,23 +967,31 @@ do
         end)
     end)
 
-    Tabs.Universal:AddSection("Admin Commands")
-
-    Tabs.Universal:AddButton({
-        Title = "Execute NexsCmds (Universal Admin)",
-        Description = "Loads the powerful Universal Admin commands script.",
-        Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/NexsCmds/Menu/client.luau"))()
-        end
-    })
-
     Tabs.Universal:AddSection("Combat Utilities")
 
     Tabs.Universal:AddButton({
         Title = "Execute AimBot + ESP (Latest)",
         Description = "Universal aimbot and ESP with FOV, silent aim, hitbox expander, and triggerbot.",
         Callback = function()
-            loadstring(game:HttpGet("https://pastebin.com/raw/bJ5AuiX5"))()
+            local urls = {
+                "https://raw.githubusercontent.com/gokuthug1/-AimBot-ESP-latest-/main/src/main.lua",
+                "https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/main/script/aimbot-esp.lua"
+            }
+            local loaded = false
+            for _, url in ipairs(urls) do
+                local ok, body = pcall(function() return game:HttpGet(url) end)
+                if ok and type(body) == "string" and body ~= "" and not body:lower():find("<!doctype") then
+                    local fn, err = loadstring(body)
+                    if fn then
+                        local ran, rErr = pcall(fn)
+                        if ran then loaded = true break end
+                    end
+                end
+            end
+            if not loaded then
+                warn("[gokuthug1's Hub] Failed to load AimBot+ESP from all sources.")
+                Fluent:Notify({ Title = "AimBot+ESP", Content = "Failed to load. Check console.", Duration = 5 })
+            end
         end
     })
 
