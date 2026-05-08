@@ -191,7 +191,10 @@ do
                 Title = "Confirm Reversion",
                 Content = "Are you sure you want to revert modifications back to structural baseline properties?",
                 Buttons = {
-                    { Title = "Confirm", Callback = function() pcall(function() player.Character.Humanoid.WalkSpeed = 16 end) Options.WalkSpeedSlider:SetValue(16) end },
+                    { Title = "Confirm", Callback = function()
+                        pcall(function() player.Character.Humanoid.WalkSpeed = 16 end)
+                        pcall(function() Options.WalkSpeedSlider:SetValue(16) end)
+                    end },
                     { Title = "Cancel" }
                 }
             })
@@ -215,7 +218,10 @@ do
                 Title = "Confirm Reversion",
                 Content = "Are you sure you want to revert physics modifications back to standard engine metrics?",
                 Buttons = {
-                    { Title = "Confirm", Callback = function() pcall(function() player.Character.Humanoid.JumpPower = 50 end) Options.JumpPowerSlider:SetValue(50) end },
+                    { Title = "Confirm", Callback = function()
+                        pcall(function() player.Character.Humanoid.JumpPower = 50 end)
+                        pcall(function() Options.JumpPowerSlider:SetValue(50) end)
+                    end },
                     { Title = "Cancel" }
                 }
             })
@@ -376,6 +382,62 @@ do
             if getgenv().AFKConnection then getgenv().AFKConnection:Disconnect() end
         end
     end)
+
+    do
+        local freezeConn = nil
+        local FreezeToggle = Tabs.Script:AddToggle("Freeze_Toggle", { Title = "Freeze Self (Anchor HRP)", Default = false })
+        FreezeToggle:OnChanged(function()
+            pcall(function()
+                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then hrp.Anchored = Options.Freeze_Toggle.Value end
+            end)
+        end)
+    end
+
+    do
+        local InvisToggle = Tabs.Script:AddToggle("Invisible_Toggle", { Title = "Local Invisibility", Default = false })
+        InvisToggle:OnChanged(function()
+            pcall(function()
+                for _, p in pairs(player.Character:GetDescendants()) do
+                    if p:IsA("BasePart") or p:IsA("Decal") then
+                        p.LocalTransparencyModifier = Options.Invisible_Toggle.Value and 1 or 0
+                    end
+                end
+            end)
+        end)
+    end
+
+    do
+        local avConn = nil
+        local AVToggle = Tabs.Script:AddToggle("AntiVoid_Toggle", { Title = "Anti-Void (Auto Reset on Fall)", Default = false })
+        AVToggle:OnChanged(function()
+            if Options.AntiVoid_Toggle.Value then
+                avConn = RunService.Heartbeat:Connect(function()
+                    pcall(function()
+                        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                        if hrp and hrp.Position.Y < -450 then
+                            player.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Dead)
+                        end
+                    end)
+                end)
+            else
+                if avConn then avConn:Disconnect(); avConn = nil end
+            end
+        end)
+    end
+
+    Tabs.Script:AddButton({
+        Title = "Rejoin Server",
+        Description = "Reconnects to the current server instance.",
+        Callback = function()
+            local TS = game:GetService("TeleportService")
+            if #Players:GetPlayers() <= 1 then
+                TS:Teleport(game.PlaceId, player)
+            else
+                pcall(function() TS:TeleportToPlaceInstance(game.PlaceId, game.JobId, player) end)
+            end
+        end
+    })
 
     Tabs.Script:AddSection("Universal Hitbox Expander")
     Tabs.Script:AddParagraph({
