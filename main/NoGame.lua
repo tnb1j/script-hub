@@ -87,6 +87,7 @@ if getgenv().GameName then
         Gameworks = Window:AddTab({ Title = getgenv().GameName, Icon = "gamepad-2" }),
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
         Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
+        Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
         game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
     }
@@ -96,6 +97,7 @@ else
         Gameworks = Window:AddTab({ Title = "Unknown Game", Icon = "gamepad-2" }),
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
         Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
+        Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
         game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
     }
@@ -518,6 +520,313 @@ do
         Description = "Custom Roblox explorer and instance viewer.",
         Callback = function()
             loadstring(game:HttpGet("https://github.com/gokuthug1/GokuDex/raw/refs/heads/main/GokuDex.lua"))()
+        end
+    })
+
+    -- =====================================
+    -- UI: DEBUGGER TAB
+    -- =====================================
+    Tabs.Debugger:AddSection("Environment Info")
+
+    Tabs.Debugger:AddButton({
+        Title = "Dump Player Info",
+        Description = "Prints full local player data to the developer console.",
+        Callback = function()
+            local lp = Players.LocalPlayer
+            print("===== PLAYER DUMP =====")
+            print("Name:        " .. tostring(lp.Name))
+            print("DisplayName: " .. tostring(lp.DisplayName))
+            print("UserId:      " .. tostring(lp.UserId))
+            print("AccountAge:  " .. tostring(lp.AccountAge) .. " days")
+            print("Premium:     " .. tostring(lp.MembershipType == Enum.MembershipType.Premium))
+            print("Team:        " .. tostring(lp.Team))
+            print("Character:   " .. tostring(lp.Character))
+            if lp.Character then
+                local hum = lp.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    print("Health:      " .. tostring(hum.Health) .. " / " .. tostring(hum.MaxHealth))
+                    print("WalkSpeed:   " .. tostring(hum.WalkSpeed))
+                    print("JumpPower:   " .. tostring(hum.JumpPower))
+                end
+                local root = lp.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    print("Position:    " .. tostring(root.Position))
+                end
+            end
+            print("=======================")
+        end
+    })
+
+    Tabs.Debugger:AddButton({
+        Title = "Dump Game Info",
+        Description = "Prints place ID, job ID, server info, and loaded services.",
+        Callback = function()
+            print("===== GAME DUMP =====")
+            print("PlaceId:     " .. tostring(game.PlaceId))
+            print("JobId:       " .. tostring(game.JobId))
+            print("PlaceVersion:" .. tostring(game.PlaceVersion))
+            pcall(function()
+                local info = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+                print("Game Name:   " .. tostring(info.Name))
+                print("Creator:     " .. tostring(info.Creator and info.Creator.Name))
+            end)
+            print("Players:     " .. tostring(#Players:GetPlayers()))
+            print("Server Time: " .. tostring(workspace.DistributedGameTime) .. "s")
+            print("====================")
+        end
+    })
+
+    Tabs.Debugger:AddButton({
+        Title = "Dump Executor Info",
+        Description = "Prints detected executor capabilities and environment.",
+        Callback = function()
+            print("===== EXECUTOR DUMP =====")
+            print("request:         " .. tostring(request ~= nil))
+            print("http_request:    " .. tostring(http_request ~= nil))
+            print("syn.request:     " .. tostring(syn ~= nil and syn.request ~= nil))
+            print("getrawmetatable: " .. tostring(getrawmetatable ~= nil))
+            print("setreadonly:     " .. tostring(setreadonly ~= nil))
+            print("getnamecallmethod:" .. tostring(getnamecallmethod ~= nil))
+            print("hookfunction:    " .. tostring(hookfunction ~= nil))
+            print("decompile:       " .. tostring(decompile ~= nil))
+            print("getgc:           " .. tostring(getgc ~= nil))
+            print("getscripts:      " .. tostring(getscripts ~= nil))
+            print("getsenv:         " .. tostring(getsenv ~= nil))
+            print("==========================")
+        end
+    })
+
+    Tabs.Debugger:AddSection("Remote Inspector")
+
+    Tabs.Debugger:AddButton({
+        Title = "List All RemoteEvents",
+        Description = "Scans the entire game tree and prints every RemoteEvent found.",
+        Callback = function()
+            print("===== REMOTE EVENTS =====")
+            local count = 0
+            for _, obj in ipairs(game:GetDescendants()) do
+                if obj:IsA("RemoteEvent") then
+                    count = count + 1
+                    print("[" .. count .. "] " .. obj:GetFullName())
+                end
+            end
+            print("Total: " .. count .. " RemoteEvents")
+            print("=========================")
+        end
+    })
+
+    Tabs.Debugger:AddButton({
+        Title = "List All RemoteFunctions",
+        Description = "Scans the entire game tree and prints every RemoteFunction found.",
+        Callback = function()
+            print("===== REMOTE FUNCTIONS =====")
+            local count = 0
+            for _, obj in ipairs(game:GetDescendants()) do
+                if obj:IsA("RemoteFunction") then
+                    count = count + 1
+                    print("[" .. count .. "] " .. obj:GetFullName())
+                end
+            end
+            print("Total: " .. count .. " RemoteFunctions")
+            print("===========================")
+        end
+    })
+
+    Tabs.Debugger:AddButton({
+        Title = "List All BindableEvents",
+        Description = "Scans the entire game tree and prints every BindableEvent found.",
+        Callback = function()
+            print("===== BINDABLE EVENTS =====")
+            local count = 0
+            for _, obj in ipairs(game:GetDescendants()) do
+                if obj:IsA("BindableEvent") then
+                    count = count + 1
+                    print("[" .. count .. "] " .. obj:GetFullName())
+                end
+            end
+            print("Total: " .. count .. " BindableEvents")
+            print("==========================")
+        end
+    })
+
+    do
+        local remoteLogEnabled = false
+        local remoteLogConnection = nil
+
+        local RemoteLogToggle = Tabs.Debugger:AddToggle("RemoteLog_Toggle", {
+            Title = "Toggle Remote Logger",
+            Default = false
+        })
+
+        RemoteLogToggle:OnChanged(function()
+            remoteLogEnabled = Options.RemoteLog_Toggle.Value
+            if remoteLogEnabled then
+                pcall(function()
+                    local mt = getrawmetatable(game)
+                    setreadonly(mt, false)
+                    local oldNamecall = mt.__namecall
+                    getgenv()._remoteLogOldNamecall = oldNamecall
+                    mt.__namecall = function(self, ...)
+                        local method = getnamecallmethod()
+                        if remoteLogEnabled and (method == "FireServer" or method == "InvokeServer" or method == "FireAllClients") then
+                            print("[REMOTE] " .. method .. " -> " .. tostring(self:GetFullName()))
+                        end
+                        return oldNamecall(self, ...)
+                    end
+                    setreadonly(mt, true)
+                end)
+                print("[Debugger] Remote Logger ON")
+            else
+                pcall(function()
+                    local mt = getrawmetatable(game)
+                    setreadonly(mt, false)
+                    mt.__namecall = getgenv()._remoteLogOldNamecall
+                    setreadonly(mt, true)
+                end)
+                print("[Debugger] Remote Logger OFF")
+            end
+        end)
+    end
+
+    Tabs.Debugger:AddSection("Script Inspector")
+
+    Tabs.Debugger:AddButton({
+        Title = "List All LocalScripts",
+        Description = "Scans and prints every LocalScript in the game.",
+        Callback = function()
+            print("===== LOCAL SCRIPTS =====")
+            local count = 0
+            for _, obj in ipairs(game:GetDescendants()) do
+                if obj:IsA("LocalScript") then
+                    count = count + 1
+                    print("[" .. count .. "] " .. obj:GetFullName() .. (obj.Disabled and " [DISABLED]" or ""))
+                end
+            end
+            print("Total: " .. count .. " LocalScripts")
+            print("=========================")
+        end
+    })
+
+    Tabs.Debugger:AddButton({
+        Title = "List All ModuleScripts",
+        Description = "Scans and prints every ModuleScript in the game.",
+        Callback = function()
+            print("===== MODULE SCRIPTS =====")
+            local count = 0
+            for _, obj in ipairs(game:GetDescendants()) do
+                if obj:IsA("ModuleScript") then
+                    count = count + 1
+                    print("[" .. count .. "] " .. obj:GetFullName())
+                end
+            end
+            print("Total: " .. count .. " ModuleScripts")
+            print("==========================")
+        end
+    })
+
+    Tabs.Debugger:AddButton({
+        Title = "Dump Running Scripts",
+        Description = "Lists all scripts currently executing (requires getscripts).",
+        Callback = function()
+            print("===== RUNNING SCRIPTS =====")
+            if getscripts then
+                local scripts = getscripts()
+                for i, s in ipairs(scripts) do
+                    print("[" .. i .. "] " .. tostring(s.Name) .. " | " .. tostring(s:GetFullName()))
+                end
+                print("Total: " .. #scripts)
+            else
+                print("getscripts() not available in this executor.")
+            end
+            print("===========================")
+        end
+    })
+
+    Tabs.Debugger:AddSection("Performance")
+
+    Tabs.Debugger:AddButton({
+        Title = "Print Memory Usage",
+        Description = "Shows current Lua memory usage and Roblox stats.",
+        Callback = function()
+            print("===== MEMORY STATS =====")
+            print("Lua memory:  " .. string.format("%.2f MB", collectgarbage("count") / 1024))
+            pcall(function()
+                local stats = game:GetService("Stats")
+                print("DataReceive: " .. string.format("%.2f KB/s", stats.DataReceiveKbps))
+                print("DataSend:    " .. string.format("%.2f KB/s", stats.DataSendKbps))
+                print("Physics:     " .. string.format("%.2f ms", stats.PhysicsReceiveKbps))
+            end)
+            print("========================")
+        end
+    })
+
+    Tabs.Debugger:AddButton({
+        Title = "Print Current FPS",
+        Description = "Samples FPS over 1 second and prints the result.",
+        Callback = function()
+            task.spawn(function()
+                local frames = 0
+                local conn
+                conn = RunService.RenderStepped:Connect(function()
+                    frames = frames + 1
+                end)
+                task.wait(1)
+                conn:Disconnect()
+                print("[FPS] Measured: " .. frames .. " fps")
+            end)
+        end
+    })
+
+    do
+        local fpsMonitorConn = nil
+        local FPSToggle = Tabs.Debugger:AddToggle("FPSMonitor_Toggle", {
+            Title = "Toggle FPS Monitor",
+            Default = false
+        })
+        FPSToggle:OnChanged(function()
+            if Options.FPSMonitor_Toggle.Value then
+                local frameCount = 0
+                local lastPrint = tick()
+                fpsMonitorConn = RunService.RenderStepped:Connect(function()
+                    frameCount = frameCount + 1
+                    if tick() - lastPrint >= 5 then
+                        print("[FPS Monitor] " .. math.floor(frameCount / (tick() - lastPrint)) .. " fps")
+                        frameCount = 0
+                        lastPrint = tick()
+                    end
+                end)
+                print("[Debugger] FPS Monitor ON (prints every 5s)")
+            else
+                if fpsMonitorConn then
+                    fpsMonitorConn:Disconnect()
+                    fpsMonitorConn = nil
+                end
+                print("[Debugger] FPS Monitor OFF")
+            end
+        end)
+    end
+
+    Tabs.Debugger:AddButton({
+        Title = "Dump Character Stats",
+        Description = "Prints full character CFrame, velocity, and part count.",
+        Callback = function()
+            local char = Players.LocalPlayer.Character
+            if not char then print("[Debugger] No character loaded.") return end
+            print("===== CHARACTER STATS =====")
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                print("CFrame:   " .. tostring(root.CFrame))
+                print("Position: " .. tostring(root.Position))
+                print("Velocity: " .. tostring(root.AssemblyLinearVelocity))
+            end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                print("Health:   " .. hum.Health .. " / " .. hum.MaxHealth)
+                print("State:    " .. tostring(hum:GetState()))
+                print("MoveDir:  " .. tostring(hum.MoveDirection))
+            end
+            print("Parts:    " .. #char:GetChildren() .. " children")
+            print("===========================")
         end
     })
 
