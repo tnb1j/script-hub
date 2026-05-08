@@ -485,7 +485,6 @@ do
             loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
         end
     })
-
     Tabs.Universal:AddSection("Client Utilities")
 
     Tabs.Universal:AddButton({
@@ -507,10 +506,18 @@ do
     Tabs.Universal:AddSection("Combat Utilities")
 
     Tabs.Universal:AddButton({
-        Title = "Execute AimBot + ESP v4.7",
+        Title = "Execute AimBot + ESP (Latest)",
         Description = "Universal aimbot and ESP with FOV, silent aim, hitbox expander, and triggerbot.",
         Callback = function()
-            loadstring(game:HttpGet("https://pastebin.com/raw/sAru4B6j"))()
+            loadstring(game:HttpGet("https://pastebin.com/raw/bJ5AuiX5"))()
+        end
+    })
+
+    Tabs.Universal:AddButton({
+        Title = "Execute GokuDex",
+        Description = "Custom Roblox explorer and instance viewer.",
+        Callback = function()
+            loadstring(game:HttpGet("https://github.com/gokuthug1/GokuDex/raw/refs/heads/main/GokuDex.lua"))()
         end
     })
 
