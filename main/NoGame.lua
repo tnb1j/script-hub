@@ -11,6 +11,7 @@ local GameJobId = game.JobId
 local AccountAge = player.AccountAge
 local hasPremium = player.MembershipType == Enum.MembershipType.Premium
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local Request = request or http_request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request)
 
 local REPO_OWNER = "tnb1j"
