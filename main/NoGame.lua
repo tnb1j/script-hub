@@ -87,6 +87,7 @@ if getgenv().GameName then
         Gameworks = Window:AddTab({ Title = getgenv().GameName, Icon = "gamepad-2" }),
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
         Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
+        Listener = Window:AddTab({ Title = "Listener", Icon = "terminal" }),
         Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
         game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
@@ -97,6 +98,7 @@ else
         Gameworks = Window:AddTab({ Title = "Unknown Game", Icon = "gamepad-2" }),
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
         Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
+        Listener = Window:AddTab({ Title = "Listener", Icon = "terminal" }),
         Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
         game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
@@ -705,11 +707,87 @@ do
         end
     })
 
-    Tabs.Universal:AddButton({
-        Title = "Launch gokuthug1 Advanced UI",
-        Description = "Full custom UI: Marketplace & Remote listener, Console, Fly, Rejoin, and more.",
+    -- =====================================
+    -- UI: LISTENER TAB
+    -- =====================================
+    Tabs.Listener:AddSection("LogService Output")
+
+    local LogParagraph = Tabs.Listener:AddParagraph({ Title = "Game Logs", Content = "Waiting for logs..." })
+    getgenv().HubGameLogs = {}
+
+    local LogService = game:GetService("LogService")
+    LogService.MessageOut:Connect(function(msg, mtype)
+        table.insert(getgenv().HubGameLogs, 1, os.date("[%H:%M:%S] ") .. msg)
+        if #getgenv().HubGameLogs > 25 then table.remove(getgenv().HubGameLogs, 26) end
+        pcall(function() LogParagraph:SetDesc(table.concat(getgenv().HubGameLogs, "\n")) end)
+    end)
+
+    Tabs.Listener:AddButton({
+        Title = "Clear Logs",
         Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/gokuthug1-ui.lua"))()
+            getgenv().HubGameLogs = {}
+            pcall(function() LogParagraph:SetDesc("Waiting for logs...") end)
+        end
+    })
+
+    Tabs.Listener:AddSection("Remote Spy")
+
+    local RemoteSpyToggle = Tabs.Listener:AddToggle("RemoteSpy_Toggle", { Title = "Remote Spy (Logs to F9)", Default = false })
+    local oldNamecall
+    if hookmetamethod then
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            if Options.RemoteSpy_Toggle.Value then
+                local method = getnamecallmethod()
+                if method == "FireServer" or method == "InvokeServer" then
+                    print(string.format("[Remote Spy] %s -> %s", tostring(self), method))
+                end
+            end
+            return oldNamecall(self, ...)
+        end)
+    end
+
+    Tabs.Listener:AddSection("Marketplace Blocker")
+
+    local BlockPurchasesToggle = Tabs.Listener:AddToggle("BlockPurchases_Toggle", { Title = "Block Purchases", Default = false })
+    local mt = getrawmetatable and getrawmetatable(game:GetService("MarketplaceService"))
+    if mt then
+        local oldIndex = mt.__index
+        setreadonly(mt, false)
+        mt.__index = function(self, k, ...)
+            if Options.BlockPurchases_Toggle.Value and (k == "PromptProductPurchase" or k == "PromptPurchase" or k == "PromptGamePassPurchase") then
+                warn("[Purchase Blocked] Prevented prompt for: " .. tostring(k))
+                return function() end
+            end
+            return oldIndex(self, k, ...)
+        end
+        setreadonly(mt, true)
+    end
+
+    Tabs.Listener:AddSection("Console / Executor")
+
+    local LuaInput = ""
+    Tabs.Listener:AddInput("LuaConsole_Input", {
+        Title = "Lua Code",
+        Default = "",
+        Placeholder = "print('Hello')",
+        Numeric = false,
+        Finished = false,
+        Callback = function(Value)
+            LuaInput = Value
+        end
+    })
+
+    Tabs.Listener:AddButton({
+        Title = "Execute Code",
+        Callback = function()
+            if LuaInput == "" then return end
+            local fn, err = loadstring(LuaInput)
+            if fn then
+                local ok, res = pcall(fn)
+                if not ok then warn("Execute Error: " .. tostring(res)) end
+            else
+                warn("Syntax Error: " .. tostring(err))
+            end
         end
     })
 
