@@ -146,7 +146,7 @@ local function SafeLoad(url, name)
     return res
 end
 
-SafeLoad("https://raw.githubusercontent.com/tnb1j/script-hub/main/GUIS/Off-site/Notify.lua", "Notify System")
+SafeLoad("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/GUIS/Off-site/Notify.lua", "Notify System")
 
 local function GetAsset(asset)
     if not asset or asset == "" then return "" end
@@ -481,7 +481,7 @@ getgenv().Notify = function(data)
     end
 end
 
-local SettingsLib = SafeLoad("https://raw.githubusercontent.com/tnb1j/script-hub/main/main/Settings.lua", "Settings Library")
+local SettingsLib = SafeLoad("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/main/Settings.lua", "Settings Library")
 if type(SettingsLib) ~= "table" or not SettingsLib.UI then
     getgenv().Notify({
         Title = "7yd7 | Error",
@@ -1902,7 +1902,7 @@ BtnImportSettings.MouseButton1Click:Connect(function() HandleImportPrompt("Setti
 BtnImportFavorites.MouseButton1Click:Connect(function() HandleImportPrompt("Favorites") end)
 
 pcall(function()
-    SafeLoad("https://raw.githubusercontent.com/tnb1j/script-hub/main/GUIS/count-emote", "Count Emote")
+    SafeLoad("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/GUIS/count-emote", "Count Emote")
 end)
 
 getgenv().Notify({
@@ -4216,7 +4216,7 @@ task.spawn(function()
 end)
 
 if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-    SafeLoad("https://raw.githubusercontent.com/tnb1j/script-hub/main/GUIS/OpenEmote.lua", "Open Emote")
+    SafeLoad("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/GUIS/OpenEmote.lua", "Open Emote")
     getgenv().Notify({
         Title = '7yd7 | Emote Mobile',
         Content = '📱 Added emote open button for ease of use',

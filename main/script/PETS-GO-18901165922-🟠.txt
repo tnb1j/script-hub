@@ -1155,7 +1155,7 @@ Tabs.Gameworks:AddButton({
                 clipboardText = clipboardText .. string.format('    {id = "%s", repeatCount = %d, rarity = %d},\n', pet.id, pet.repeatCount, rarityValue)
             end
         end
-        clipboardText = clipboardText .. '}\n\nloadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/main/Autoexec/PETS-GO"))()'
+        clipboardText = clipboardText .. '}\n\nloadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/Autoexec/PETS-GO"))()'
 
         setclipboard(clipboardText)
         Fluent:Notify({
@@ -1174,7 +1174,7 @@ Tabs.Gameworks:AddButton({
     Description = "Copy the script to use it in Autoexec.",
     Callback = function()
 
-        local clipboardText = '--[[\nSimple script to rejoin the Claim Roll topic\nChange the [number] to a lucky number or a percentage as you call it\nExample: 50000\nIf you want more than one thing just put 10-1000 | it will be 10 to 10,000\n]]\ngetgenv().targetValue = "number"\nloadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/main/Autoexec/PETS-GO-rejoin-RollClaim"))()'
+        local clipboardText = '--[[\nSimple script to rejoin the Claim Roll topic\nChange the [number] to a lucky number or a percentage as you call it\nExample: 50000\nIf you want more than one thing just put 10-1000 | it will be 10 to 10,000\n]]\ngetgenv().targetValue = "number"\nloadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/Autoexec/PETS-GO-rejoin-RollClaim"))()'
 
         setclipboard(clipboardText)
         Fluent:Notify({
@@ -1186,4 +1186,4 @@ Tabs.Gameworks:AddButton({
 })
 end
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/main/main/NoGame.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/main/NoGame.lua"))()

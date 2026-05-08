@@ -1,4 +1,4 @@
-local SETTINGS_URL = "https://raw.githubusercontent.com/tnb1j/script-hub/main/main/Settings.lua"
+local SETTINGS_URL = "https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/main/Settings.lua"
 
 local function looksLikeHtml(body)
     if type(body) ~= "string" then

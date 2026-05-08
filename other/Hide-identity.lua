@@ -10,7 +10,7 @@ getgenv().IdentityConfig = getgenv().IdentityConfig or {
     FakeGameName = "???",
 }
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/main/other/Hide-identity.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Hide-identity.lua"))()
 ]]
 
 local Players = game:GetService("Players")

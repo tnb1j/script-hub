@@ -6,7 +6,8 @@ local Request = request or http_request or (syn and syn.request) or (http and ht
 local REPO_OWNER = "tnb1j"
 local REPO_NAME = "script-hub"
 local REPO_BRANCH = "main"
-local RAW_BASE_URL = ("https://raw.githubusercontent.com/%s/%s/%s"):format(REPO_OWNER, REPO_NAME, REPO_BRANCH)
+local RAW_REF_PATH = "refs/heads/" .. REPO_BRANCH
+local RAW_BASE_URL = ("https://raw.githubusercontent.com/%s/%s/%s"):format(REPO_OWNER, REPO_NAME, RAW_REF_PATH)
 local DIRECTORY_URL = ("https://api.github.com/repos/%s/%s/contents/main/script?ref=%s"):format(REPO_OWNER, REPO_NAME, REPO_BRANCH)
 local UNIVERSAL_SCRIPT_URL = RAW_BASE_URL .. "/main/NoGame.lua"
 
@@ -67,7 +68,28 @@ local function httpGet(url)
     return false, tostring(body)
 end
 
+local function normalizeRepoRawUrl(url)
+    if type(url) ~= "string" or url == "" then
+        return url
+    end
+
+    local rawPrefix = ("https://raw.githubusercontent.com/%s/%s/"):format(REPO_OWNER, REPO_NAME)
+    local branchPrefix = rawPrefix .. REPO_BRANCH .. "/"
+    local refsPrefix = rawPrefix .. RAW_REF_PATH .. "/"
+
+    if url:sub(1, #refsPrefix) == refsPrefix then
+        return url
+    end
+
+    if url:sub(1, #branchPrefix) == branchPrefix then
+        return refsPrefix .. url:sub(#branchPrefix + 1)
+    end
+
+    return url
+end
+
 local function loadRemoteScript(url, label)
+    url = normalizeRepoRawUrl(url)
     local ok, bodyOrError = httpGet(url)
     if not ok then
         warn(string.format("[gokuthug1's Hub] Failed to fetch %s from %s: %s", label, url, bodyOrError))

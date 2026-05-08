@@ -1,5 +1,5 @@
 --[[
-loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/main/other/Privateserver.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Privateserver.lua"))()
 
 
  Script not made by me, My process has been made easy.
