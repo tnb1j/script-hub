@@ -1,0 +1,1174 @@
+getgenv().Tabs = nil
+getgenv().Options = nil
+getgenv().Window = nil
+getgenv().Toggle = nil
+getgenv().Value = nil
+
+getgenv().GameName = "Build An Island!"
+
+if getgenv().ScriptGe then
+    getgenv().ScriptGe = nil
+end
+
+if getgenv().update then
+    getgenv().update = nil
+end
+
+getgenv().update = function()
+    local text = [[
+1.0.4 | 2025/9/5
+  * added Hit Mode > Hit When Fully Grown
+
+1.0.3 | 2025/7/5
+  * improvement Contribute To Expand
+
+1.0.2 | 2025/7/4
+  * Fixed Item Buys
+
+1.0.1 | 2025/7/2
+  + add Select Crafts
+  + Auto Buy From Merchant
+
+1.0.0 | 2025/7/1
+  + add Script Build An Island! 🏝️
+    ]]
+    return text
+end
+
+getgenv().ScriptGe = function()
+
+Tabs.Gameworks:AddSection("Auto")
+
+local Slider = Tabs.Gameworks:AddSlider("Slider", {
+    Title = "Speed Wait Hit Resource/Contribute",
+    Description = "Speed Wait to Hit Resource/Contribute To Expand",
+    Default = 0.3, 
+    Min = 0,    
+    Max = 10,  
+    Rounding = 1, 
+    Callback = function(Value)
+        getgenv().SpeedAutoHitResource = Value
+    end
+})
+
+
+getgenv().AutoA = false
+getgenv().SelectedResources = {"All"}
+getgenv().ResourcesList = {"All"}
+getgenv().ResourcesDropdown = nil 
+
+function updateResourcesList()
+    local Players = game:GetService("Players")
+    local localPlayer = Players.LocalPlayer
+    local plotName = localPlayer.Name
+    local plot = workspace:FindFirstChild("Plots"):FindFirstChild(plotName)
+    
+    local newResourcesList = {"All"}
+    local resourceNames = {} 
+    resourceNames["All"] = true 
+    
+    if plot and plot:FindFirstChild("Resources") then
+        for _, resource in ipairs(plot.Resources:GetChildren()) do
+            if resource.Name and not resourceNames[resource.Name] then
+                table.insert(newResourcesList, resource.Name)
+                resourceNames[resource.Name] = true
+            end
+        end
+    end
+    
+    local hasChanged = false
+    if #newResourcesList ~= #getgenv().ResourcesList then
+        hasChanged = true
+    else
+        for i, resourceName in ipairs(newResourcesList) do
+            if getgenv().ResourcesList[i] ~= resourceName then
+                hasChanged = true
+                break
+            end
+        end
+    end
+    
+    if hasChanged then
+        getgenv().ResourcesList = newResourcesList
+        updateDropdownValues()
+    end
+end
+
+function updateDropdownValues()
+    if getgenv().ResourcesDropdown then
+        getgenv().ResourcesDropdown:SetValues(getgenv().ResourcesList)
+        
+        local validSelections = {}
+        for _, selectedResource in ipairs(getgenv().SelectedResources) do
+            for _, availableResource in ipairs(getgenv().ResourcesList) do
+                if selectedResource == availableResource then
+                    validSelections[selectedResource] = true
+                    break
+                end
+            end
+        end
+        
+        if next(validSelections) == nil then
+            validSelections["All"] = true
+            getgenv().SelectedResources = {"All"}
+        end
+        
+        getgenv().ResourcesDropdown:SetValue(validSelections)
+
+    end
+end
+
+function getInitialResourcesList()
+    local Players = game:GetService("Players")
+    local localPlayer = Players.LocalPlayer
+    local plotName = localPlayer.Name
+    local plot = workspace:FindFirstChild("Plots"):FindFirstChild(plotName)
+    
+    local initialResourcesList = {"All"}
+    local resourceNames = {} 
+    resourceNames["All"] = true 
+    
+    if plot and plot:FindFirstChild("Resources") then
+        for _, resource in ipairs(plot.Resources:GetChildren()) do
+            if resource.Name and not resourceNames[resource.Name] then
+                table.insert(initialResourcesList, resource.Name)
+                resourceNames[resource.Name] = true
+            end
+        end
+    end
+    
+    return initialResourcesList
+end
+
+local Toggle = Tabs.Gameworks:AddToggle("AutoHitResource", {
+    Title = "Auto Hit Resource",
+    Default = false
+})
+Toggle:OnChanged(function()
+    getgenv().AutoA = Options.AutoHitResource.Value
+    if getgenv().AutoA then
+        startAutoHitResourceLoop()
+    else
+        getgenv().AutoA = false
+    end
+end)
+
+getgenv().HitModeDropdown = Tabs.Gameworks:AddDropdown("HitModeSelection", {
+    Title = "Hit Mode",
+    Description = "Choose when to hit resources",
+    Values = {"Hit When Growing", "Hit When Fully Grown"},
+    Multi = false,
+    Default = 1,
+})
+
+getgenv().HitMode = "Hit When Growing" 
+
+getgenv().HitModeDropdown:OnChanged(function(Value)
+    getgenv().HitMode = Value
+end)
+
+local initialValues = getInitialResourcesList()
+getgenv().ResourcesList = initialValues
+
+getgenv().ResourcesDropdown = Tabs.Gameworks:AddDropdown("ResourcesSelection", {
+    Title = "Select Resources to Hit",
+    Description = "Choose which resources to automatically hit.",
+    Values = initialValues,
+    Multi = true,
+    Default = {"All"},
+})
+
+getgenv().ResourcesDropdown:OnChanged(function(Value)
+    local selectedValues = {}
+    for resourceName, isSelected in pairs(Value) do
+        if isSelected then
+            table.insert(selectedValues, resourceName)
+        end
+    end
+   
+    getgenv().SelectedResources = selectedValues
+end)
+
+function shouldHitResource(resourceName)
+    for _, selected in ipairs(getgenv().SelectedResources or {}) do
+        if selected == "All" then
+            return true
+        end
+        if selected == resourceName then
+            return true
+        end
+    end
+    return false
+end
+
+function isResourceFullyGrown(resource)
+    local highestNumber = -1
+    
+    for _, child in ipairs(resource:GetChildren()) do
+        local number = tonumber(child.Name)
+        if number and number > highestNumber then
+            highestNumber = number
+        end
+    end
+    
+    if highestNumber >= 0 then
+        local highestChild = resource:FindFirstChild(tostring(highestNumber))
+        if highestChild then
+            for _, part in ipairs(highestChild:GetChildren()) do
+                if part:IsA("Part") then
+                    return part.Transparency == 0
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+function hitWhenFullyGrown(resource)
+    local numbers = {}
+    for _, child in ipairs(resource:GetChildren()) do
+        local number = tonumber(child.Name)
+        if number and number >= 0 then
+            table.insert(numbers, number)
+        end
+    end
+    
+    if #numbers == 0 then return false end
+    
+    table.sort(numbers, function(a, b) return a > b end)
+    
+    local highestNumber = numbers[1]
+    local highestChild = resource:FindFirstChild(tostring(highestNumber))
+    if not highestChild then return false end
+    
+    local highestPart = nil
+    for _, part in ipairs(highestChild:GetChildren()) do
+        if part:IsA("Part") then
+            highestPart = part
+            break
+        end
+    end
+    
+    if not highestPart or highestPart.Transparency ~= 0 then
+        return false 
+    end
+    
+    for _, number in ipairs(numbers) do
+        local numberChild = resource:FindFirstChild(tostring(number))
+        if numberChild then
+            for _, part in ipairs(numberChild:GetChildren()) do
+                if part:IsA("Part") then
+                    if part.Transparency == 1 then
+                        return true
+                    elseif part.Transparency == 0 then
+                        local success, errorMsg = pcall(function()
+                            game:GetService("ReplicatedStorage").Communication.HitResource:FireServer(resource)
+                        end)
+                    end
+                    break 
+                end
+            end
+        end
+    end
+    
+    return true
+end
+
+function startAutoHitResourceLoop()
+    spawn(function()
+        while getgenv().AutoA do
+            wait(getgenv().SpeedAutoHitResource)
+           
+            local Players = game:GetService("Players")
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+           
+            local localPlayer = Players.LocalPlayer
+            local plotName = localPlayer.Name
+            local plot = workspace:FindFirstChild("Plots"):FindFirstChild(plotName)
+           
+            if plot and plot:FindFirstChild("Resources") then
+                for _, resource in ipairs(plot.Resources:GetChildren()) do
+                    if shouldHitResource(resource.Name) then
+                        if resource and resource.Parent then
+                            if getgenv().HitMode == "Hit When Growing" then
+                                local success, errorMsg = pcall(function()
+                                    ReplicatedStorage.Communication.HitResource:FireServer(resource)
+                                end)
+                            elseif getgenv().HitMode == "Hit When Fully Grown" then
+                                hitWhenFullyGrown(resource)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+function startResourcesUpdateLoop()
+    spawn(function()
+        while true do
+            wait(1)
+            updateResourcesList()
+        end
+    end)
+end
+
+startResourcesUpdateLoop()
+
+spawn(function()
+    wait(2)
+    updateResourcesList()
+end)
+
+
+local Toggle = Tabs.Gameworks:AddToggle("ContributeToExpandAuto", {Title = "Auto Contribute To Expand", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoContributeToExpandA = Options.ContributeToExpandAuto.Value
+
+    if getgenv().AutoContributeToExpandA then
+        ContributeToExpandAutoLoop()
+    else
+        getgenv().AutoContributeToExpandA = false
+    end
+end)
+
+
+function ContributeToExpandAutoLoop()
+    spawn(function()
+        while getgenv().AutoContributeToExpandA do 
+            wait(SpeedAutoHitResource)
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local localPlayer = Players.LocalPlayer
+local plotName = localPlayer.Name
+local expandFolder = workspace:WaitForChild("Plots"):FindFirstChild(plotName):FindFirstChild("Expand")
+local currenciesFolder = localPlayer:WaitForChild("PlayerGui"):WaitForChild("Main")
+    :WaitForChild("Left"):WaitForChild("Currencies")
+
+for _, expandItem in ipairs(expandFolder:GetChildren()) do
+    local ohString1 = expandItem.Name
+    local billboardGui = expandItem:FindFirstChild("Top") and expandItem.Top:FindFirstChild("BillboardGui")
+    if billboardGui then
+        for _, guiElement in ipairs(billboardGui:GetChildren()) do
+            if guiElement:IsA("Frame") and guiElement.Name ~= "UIListLayout" and guiElement.Name ~= "Example" then
+                local ohString2 = guiElement.Name
+                local ohNumber3 = 1
+                
+                if guiElement:FindFirstChild("Amount") then
+                    local amountText = guiElement.Amount.Text
+                    local maxAmount = string.match(amountText, "/(%d+)")
+                    if maxAmount then
+                        ohNumber3 = tonumber(maxAmount)
+                    end
+                end
+                
+                local currencyItem = currenciesFolder:FindFirstChild(ohString2)
+                if currencyItem and currencyItem:FindFirstChild("Display") then
+                    local function parseShortNumber(text)
+                        text = string.lower(text)
+                        local number = tonumber(text)
+                        if number then
+                            return number
+                        end
+                        local value = tonumber(string.match(text, "[%d%.]+"))
+                        local suffix = string.match(text, "[a-z]+")
+                        if value and suffix then
+                            if suffix == "k" then
+                                return value * 1_000
+                            elseif suffix == "m" then
+                                return value * 1_000_000
+                            elseif suffix == "b" then
+                                return value * 1_000_000_000
+                            elseif suffix == "t" then
+                                return value * 1_000_000_000_000
+                            end
+                        end
+                        return nil
+                    end
+                    
+                    local displayText = currencyItem.Display.Text
+                    local amount = parseShortNumber(displayText)
+                    if amount and amount > 1 then
+                        ReplicatedStorage.Communication.ContributeToExpand:FireServer(ohString1, ohString2, ohNumber3)
+                    end
+                end
+            end
+        end
+    end
+end
+end
+    end)
+end
+
+
+getgenv().AutoCrafterAutoA = false
+getgenv().SelectedCrafts = {"All"}
+getgenv().CraftsList = {"All"}
+getgenv().CrafterDropdown = nil
+
+function updateCraftsList()
+    local Players = game:GetService("Players")
+    local localPlayer = Players.LocalPlayer
+    local plotName = localPlayer.Name
+    
+    if not workspace:FindFirstChild("Plots") then
+        return
+    end
+    
+    local plot = workspace.Plots:FindFirstChild(plotName)
+    if not plot then
+        return
+    end
+    
+    local landFolder = plot:FindFirstChild("Land")
+    if not landFolder then
+        return
+    end
+    
+    local newCraftsList = {"All"}
+    local craftNames = {}
+    craftNames["All"] = true
+    
+    for _, item in ipairs(landFolder:GetChildren()) do
+        local crafter = item:FindFirstChild("Crafter")
+        if crafter then
+            local attachment = crafter:FindFirstChild("Attachment")
+            if attachment then
+                local item1 = attachment:GetAttribute("Item1") or attachment:GetAttribute("item1")
+                local item2 = attachment:GetAttribute("Item2") or attachment:GetAttribute("item2")
+                local output = attachment:GetAttribute("Output") or attachment:GetAttribute("output")
+                
+                local craftName = ""
+                
+                if output then
+                    if item1 and item2 then
+                        craftName = item1 .. " + " .. item2 .. " > " .. output
+                    elseif item1 then
+                        craftName = item1 .. " > " .. output
+                    end
+                else
+                    if item1 and item2 then
+                        craftName = item1 .. " > " .. item2
+                    end
+                end
+                
+                if craftName ~= "" and not craftNames[craftName] then
+                    table.insert(newCraftsList, craftName)
+                    craftNames[craftName] = true
+                end
+            end
+        end
+    end
+    
+    local hasChanged = false
+    if #newCraftsList ~= #getgenv().CraftsList then
+        hasChanged = true
+    else
+        for i, craftName in ipairs(newCraftsList) do
+            if getgenv().CraftsList[i] ~= craftName then
+                hasChanged = true
+                break
+            end
+        end
+    end
+    
+    if hasChanged then
+        getgenv().CraftsList = newCraftsList
+        updateDropdownValues()
+    end
+end
+
+function updateDropdownValues()
+    if getgenv().CrafterDropdown then
+        if getgenv().CrafterDropdown.SetValues then
+            getgenv().CrafterDropdown:SetValues(getgenv().CraftsList)
+        end
+        
+        if getgenv().CrafterDropdown.Values then
+            getgenv().CrafterDropdown.Values = getgenv().CraftsList
+        end
+        
+        local validSelections = {}
+        for _, selectedCraft in ipairs(getgenv().SelectedCrafts) do
+            for _, availableCraft in ipairs(getgenv().CraftsList) do
+                if selectedCraft == availableCraft then
+                    validSelections[selectedCraft] = true
+                    break
+                end
+            end
+        end
+        
+        if next(validSelections) == nil then
+            validSelections["All"] = true
+            getgenv().SelectedCrafts = {"All"}
+        end
+        
+        getgenv().CrafterDropdown:SetValue(validSelections)
+    end
+end
+
+function getInitialCraftsList()
+    local Players = game:GetService("Players")
+    local localPlayer = Players.LocalPlayer
+    local plotName = localPlayer.Name
+    
+    local plots = workspace:WaitForChild("Plots", 10)
+    if not plots then
+        return {"All"}
+    end
+    
+    local plot = plots:WaitForChild(plotName, 10)
+    if not plot then
+        return {"All"}
+    end
+    
+    local landFolder = plot:WaitForChild("Land", 10)
+    if not landFolder then
+        return {"All"}
+    end
+    
+    wait(2)
+    
+    local initialCraftsList = {"All"}
+    local craftNames = {}
+    craftNames["All"] = true
+    
+    for _, item in ipairs(landFolder:GetChildren()) do
+        local crafter = item:FindFirstChild("Crafter")
+        if crafter then
+            local attachment = crafter:FindFirstChild("Attachment")
+            if attachment then
+                local item1 = attachment:GetAttribute("Item1") or attachment:GetAttribute("item1")
+                local item2 = attachment:GetAttribute("Item2") or attachment:GetAttribute("item2")
+                local output = attachment:GetAttribute("Output") or attachment:GetAttribute("output")
+                
+                local craftName = ""
+                
+                if output then
+                    if item1 and item2 then
+                        craftName = item1 .. " + " .. item2 .. " > " .. output
+                    elseif item1 then
+                        craftName = item1 .. " > " .. output
+                    end
+                else
+                    if item1 and item2 then
+                        craftName = item1 .. " > " .. item2
+                    end
+                end
+                
+                if craftName ~= "" and not craftNames[craftName] then
+                    table.insert(initialCraftsList, craftName)
+                    craftNames[craftName] = true
+                end
+            end
+        end
+    end
+    
+    return initialCraftsList
+end
+
+function shouldCraftItem(attachment)
+    for _, selected in ipairs(getgenv().SelectedCrafts) do
+        if selected == "All" then
+            return true
+        end
+    end
+    
+    local item1 = attachment:GetAttribute("Item1") or attachment:GetAttribute("item1")
+    local item2 = attachment:GetAttribute("Item2") or attachment:GetAttribute("item2")
+    local output = attachment:GetAttribute("Output") or attachment:GetAttribute("output")
+    
+    local craftName = ""
+    
+    if output then
+        if item1 and item2 then
+            craftName = item1 .. " + " .. item2 .. " > " .. output
+        elseif item1 then
+            craftName = item1 .. " > " .. output
+        end
+    else
+        if item1 and item2 then
+            craftName = item1 .. " > " .. item2
+        end
+    end
+    
+    for _, selected in ipairs(getgenv().SelectedCrafts) do
+        if selected == craftName then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local Toggle = Tabs.Gameworks:AddToggle("CrafterAuto", {Title = "Auto Crafter", Default = false})
+Toggle:OnChanged(function()
+    getgenv().AutoCrafterAutoA = Options.CrafterAuto.Value
+    if getgenv().AutoCrafterAutoA then
+        CrafterAutoLoop()
+    else
+        getgenv().AutoCrafterAutoA = false
+    end
+end)
+
+getgenv().CrafterDropdown = Tabs.Gameworks:AddDropdown("CrafterSelection", {
+    Title = "Select Crafts",
+    Description = "Choose which items to craft automatically.",
+    Values = {"All"},
+    Multi = true,
+    Default = {"All"},
+})
+
+getgenv().CrafterDropdown:OnChanged(function(Value)
+    local selectedValues = {}
+    for craftName, isSelected in pairs(Value) do
+        if isSelected then
+            table.insert(selectedValues, craftName)
+        end
+    end
+    
+    getgenv().SelectedCrafts = selectedValues
+end)
+
+spawn(function()
+    wait(3)
+    local initialCrafts = getInitialCraftsList()
+    getgenv().CraftsList = initialCrafts
+    
+    if getgenv().CrafterDropdown then
+        if getgenv().CrafterDropdown.Description then
+            getgenv().CrafterDropdown.Description = "Choose which items to craft automatically."
+        end
+        
+        if getgenv().CrafterDropdown.SetValues then
+            getgenv().CrafterDropdown:SetValues(getgenv().CraftsList)
+        elseif getgenv().CrafterDropdown.Values then
+            getgenv().CrafterDropdown.Values = getgenv().CraftsList
+        end
+    end
+end)
+
+function CrafterAutoLoop()
+    spawn(function()
+        while getgenv().AutoCrafterAutoA do
+            wait(SpeedAutoHitResource)
+            local Players = game:GetService("Players")
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            local localPlayer = Players.LocalPlayer
+            local plotName = localPlayer.Name
+            local plots = workspace:FindFirstChild("Plots")
+            
+            if plots then
+                local plot = plots:FindFirstChild(plotName)
+                if plot then
+                    local landFolder = plot:FindFirstChild("Land")
+                    if landFolder then
+                        for _, item in ipairs(landFolder:GetChildren()) do
+                            local crafter = item:FindFirstChild("Crafter")
+                            if crafter then
+                                local attachment = crafter:FindFirstChild("Attachment")
+                                if attachment and shouldCraftItem(attachment) then
+                                    local success, errorMsg = pcall(function()
+                                        local output = attachment:GetAttribute("Output") or attachment:GetAttribute("output")
+                                        if output then
+                                            ReplicatedStorage.Communication.DoubleCraft:FireServer(attachment)
+                                        else
+                                            ReplicatedStorage.Communication.Craft:FireServer(attachment)
+                                        end
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+function startCraftsUpdateLoop()
+    spawn(function()
+        while true do
+            wait(2)
+            updateCraftsList()
+        end
+    end)
+end
+
+startCraftsUpdateLoop()
+
+spawn(function()
+    wait(5)
+    updateCraftsList()
+end)
+
+Tabs.Gameworks:AddSection("Fish")
+
+local Slider = Tabs.Gameworks:AddSlider("Slider", {
+    Title = "double Fish repeat",
+    Default = 0.3, 
+    Min = 1,    
+    Max = 100,  
+    Rounding = 1, 
+    Callback = function(Value)
+        getgenv().SpeedAutodoubleFishrepeat = Value
+    end
+})
+
+    local ImmediateCheckButton = Tabs.Gameworks:AddButton({
+        Title = "Fish Check",
+        Callback = function()
+            for i = 1, SpeedAutodoubleFishrepeat do
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local localPlayer = Players.LocalPlayer
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local ohVector31 = rootPart.Position
+local ohNumber2 = math.huge
+
+ReplicatedStorage.Communication.Fish:InvokeServer(ohVector31, ohNumber2)
+            end
+        end
+    })
+
+local Toggle = Tabs.Gameworks:AddToggle("FishAuto", {Title = "Auto Fish", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoFishA = Options.FishAuto.Value
+
+    if getgenv().AutoFishA then
+        FishAutoLoop()
+    else
+        getgenv().AutoFishA = false
+    end
+end)
+
+function FishAutoLoop()
+    spawn(function()
+        while getgenv().AutoFishA do 
+            wait()
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local localPlayer = Players.LocalPlayer
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local ohVector31 = rootPart.Position
+local ohNumber2 = math.huge
+
+ReplicatedStorage.Communication.Fish:InvokeServer(ohVector31, ohNumber2)
+        end
+    end)
+end
+
+
+Tabs.Gameworks:AddSection("Other")
+
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local merchantPath = LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("Main")
+    .Menus.Merchant.Inner.ScrollingFrame.Hold
+local nameToRealName = {} 
+
+local Dropdown = Tabs.Gameworks:AddDropdown("MerchantDropdown", {
+    Title = "Select Item Buys",
+    Values = {"All"},
+    Multi = true,
+    Default = {"All"},
+})
+
+local lastUpdateTime = 0
+local cachedValues = {}
+local isUpdating = false
+
+local function UpdateMerchantDropdown()
+    if isUpdating then return end 
+    isUpdating = true
+    
+    local currentTime = tick()
+    local rawItems = {}
+    
+    local success, result = pcall(function()
+        local children = merchantPath:GetChildren()
+        
+        for i = 1, #children do
+            local child = children[i]
+            local className = child.ClassName
+            
+            if className ~= "UIAspectRatioConstraint" and
+               className ~= "UIGridLayout" and
+               className ~= "UIPadding" and
+               child.Name ~= "Example" then
+                
+                local count = 0
+                local isVisible = child.Visible
+                
+                if isVisible then
+                    local countObj = child:FindFirstChild("Count")
+                    
+                    if countObj and countObj.ClassName == "TextLabel" and countObj.Visible then
+                        local text = countObj.Text
+                        if text and text ~= "" then
+                            local match = string.match(text, "x(%d+)")
+                            count = match and tonumber(match) or 0
+                        end
+                    end
+                else
+                    count = 0 
+                end
+                
+                rawItems[#rawItems + 1] = {
+                    Name = child.Name,
+                    Count = count,
+                    Visible = isVisible
+                }
+            end
+        end
+        
+        table.sort(rawItems, function(a, b)
+            return a.Count > b.Count
+        end)
+        
+        return rawItems
+    end)
+    
+    if success and result then
+        local dropdownValues = {"All"}
+        local newNameToRealName = {}
+        
+        for i = 1, #result do
+            local item = result[i]
+            local display = item.Name
+            
+            if item.Count > 0 and item.Visible then
+                display = display .. " | x" .. item.Count
+            elseif not item.Visible then
+                display = display
+            else
+                display = display .. " | x0"
+            end
+            
+            dropdownValues[#dropdownValues + 1] = display
+            newNameToRealName[display] = item.Name
+        end
+        
+        local hasChanged = false
+        if #cachedValues ~= #dropdownValues then
+            hasChanged = true
+        else
+            for i = 1, #dropdownValues do
+                if cachedValues[i] ~= dropdownValues[i] then
+                    hasChanged = true
+                    break
+                end
+            end
+        end
+        
+        if hasChanged then
+            cachedValues = dropdownValues
+            nameToRealName = newNameToRealName
+            
+            task.defer(function()
+                Dropdown:SetValues(dropdownValues)
+            end)
+        end
+    end
+    
+    lastUpdateTime = currentTime
+    isUpdating = false
+end
+
+local RunService = game:GetService("RunService")
+local updateConnection
+
+updateConnection = RunService.Heartbeat:Connect(function()
+    local currentTime = tick()
+    
+    if currentTime - lastUpdateTime >= 3 then
+        task.spawn(UpdateMerchantDropdown)
+    end
+end)
+
+local Toggle = Tabs.Gameworks:AddToggle("BuyFromMerchantAuto", {
+    Title = "Auto Buy From Merchant",
+    Default = false
+})
+
+Toggle:OnChanged(function()
+    getgenv().AutoBuyFromMerchantA = Options.BuyFromMerchantAuto.Value
+    if getgenv().AutoBuyFromMerchantA then
+        BuyFromMerchantAutoLoop()
+    else
+        getgenv().AutoBuyFromMerchantA = false
+    end
+end)
+
+function BuyFromMerchantAutoLoop()
+    task.spawn(function()
+        while getgenv().AutoBuyFromMerchantA do
+            task.wait(0.1) 
+            
+            local selectedValues = Options.MerchantDropdown.Value
+            if not selectedValues or (type(selectedValues) == "table" and #selectedValues == 0) then 
+                continue 
+            end
+            
+            local function fire(name)
+                if name and name ~= "" then
+                    pcall(function()
+                        ReplicatedStorage.Communication.BuyFromMerchant:FireServer(name, false)
+                    end)
+                end
+            end
+            
+            local buyAll = false
+            if type(selectedValues) == "table" then
+                for _, value in pairs(selectedValues) do
+                    if value == "All" then
+                        buyAll = true
+                        break
+                    end
+                end
+            elseif selectedValues == "All" then
+                buyAll = true
+            end
+            
+            if buyAll then
+                local itemsToFire = {}
+                for display, realName in pairs(nameToRealName) do
+                    local countMatch = string.match(display, "| x(%d+)")
+                    if countMatch and not string.find(display, "Hidden") then
+                        local count = tonumber(countMatch)
+                        if count and count > 0 then
+                            table.insert(itemsToFire, realName)
+                        end
+                    end
+                end
+                
+                for i = 1, #itemsToFire do
+                    if not getgenv().AutoBuyFromMerchantA then break end
+                    fire(itemsToFire[i])
+                    if i < #itemsToFire then
+                        task.wait(0.05)
+                    end
+                end
+            else
+                local itemsToProcess = {}
+                
+                if type(selectedValues) == "table" then
+                    itemsToProcess = selectedValues
+                else
+                    itemsToProcess = {selectedValues}
+                end
+                
+                for _, selected in pairs(itemsToProcess) do
+                    if selected ~= "All" then
+                        local realName = nameToRealName[selected]
+                        if realName and not string.find(selected, "Hidden") then
+                            local countMatch = string.match(selected, "| x(%d+)")
+                            if countMatch then
+                                local count = tonumber(countMatch)
+                                if count and count > 0 then
+                                    fire(realName)
+                                end
+                            elseif not string.find(selected, "| x") then
+                                fire(realName)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+game:GetService("Players").PlayerRemoving:Connect(function(player)
+    if player == LocalPlayer then
+        if updateConnection then
+            updateConnection:Disconnect()
+        end
+        getgenv().AutoBuyFromMerchantA = false
+    end
+end)
+
+local Toggle = Tabs.Gameworks:AddToggle("SellAllAuto", {Title = "Auto Sell All", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoSellAllA = Options.SellAllAuto.Value
+
+    if getgenv().AutoSellAllA then
+        SellAllAutoLoop()
+    else
+        getgenv().AutoSellAllA = false
+    end
+end)
+
+function SellAllAutoLoop()
+    spawn(function()
+        while getgenv().AutoSellAllA do 
+            wait(.3)
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+  local ohBoolean1 = true
+        ReplicatedStorage.Communication.SellToMerchant:FireServer(ohBoolean1)
+
+        end
+    end)
+end
+
+
+local function getUpgradeNames()
+    local player = game:GetService("Players").LocalPlayer
+    local upgradePath = player.PlayerGui.Main.Menus.GoldUpgrades.Inner.ScrollingFrame.Hold
+    local upgradeNames = {}
+    
+    local excludeNames = {
+        "UIAspectRatioConstraint",
+        "UIListLayout", 
+        "UIPadding",
+        "Example"
+    }
+    
+    for _, child in pairs(upgradePath:GetChildren()) do
+        local shouldExclude = false
+        for _, excludeName in pairs(excludeNames) do
+            if child.Name == excludeName then
+                shouldExclude = true
+                break
+            end
+        end
+        
+        if not shouldExclude then
+            table.insert(upgradeNames, child.Name)
+        end
+    end
+    
+    return upgradeNames
+end
+
+local upgradeNames = getUpgradeNames()
+local MultiDropdown = Tabs.Gameworks:AddDropdown("MultiDropdown", {
+    Title = "Gold Upgrades", 
+    Description = "Select upgrades to auto-purchase.", 
+    Values = upgradeNames, 
+    Multi = true, 
+    Default = table.clone(upgradeNames),
+})
+
+MultiDropdown:OnChanged(function(Value)
+    local Values = {}
+    for Value, State in next, Value do
+        if State then
+            table.insert(Values, Value)
+        end
+    end
+    getgenv().SelectedUpgrades = Values
+end)
+
+getgenv().SelectedUpgrades = upgradeNames
+
+local function parseGoldAmount(text)
+    if not text then return 0 end
+    
+    text = text:gsub("Gold", ""):gsub("%s+", "")
+    
+    local number = text:match("([%d%.]+)")
+    if not number then return 0 end
+    
+    number = tonumber(number)
+    if not number then return 0 end
+    
+    if text:lower():find("k") then
+        number = number * 1000
+    elseif text:lower():find("m") then
+        number = number * 1000000
+    elseif text:lower():find("b") then
+        number = number * 1000000000
+    end
+    
+    return math.floor(number)
+end
+
+local function getUpgradeCost(upgradeName)
+    local player = game:GetService("Players").LocalPlayer
+    local upgradeButton = player.PlayerGui.Main.Menus.GoldUpgrades.Inner.ScrollingFrame.Hold:FindFirstChild(upgradeName)
+    
+    if upgradeButton and upgradeButton:FindFirstChild("Button") and upgradeButton.Button:FindFirstChild("TextLabel") then
+        local costText = upgradeButton.Button.TextLabel.Text
+        return parseGoldAmount(costText)
+    end
+    
+    return math.huge 
+end
+
+local function getCurrentGold()
+    local player = game:GetService("Players").LocalPlayer
+    if player.leaderstats and player.leaderstats:FindFirstChild("Gold") then
+        return player.leaderstats.Gold.Value
+    end
+    return 0
+end
+
+local function findCheapestAffordableUpgrade()
+    local currentGold = getCurrentGold()
+    local cheapestUpgrade = nil
+    local cheapestCost = math.huge
+    
+    for _, upgradeName in pairs(getgenv().SelectedUpgrades or {}) do
+        local cost = getUpgradeCost(upgradeName)
+        
+        if cost <= currentGold and cost < cheapestCost then
+            cheapestUpgrade = upgradeName
+            cheapestCost = cost
+        end
+    end
+    
+    return cheapestUpgrade, cheapestCost
+end
+
+local Toggle = Tabs.Gameworks:AddToggle("DoGoldUpgradeAuto", {
+    Title = "Auto Upgrade", 
+    Default = false
+})
+
+Toggle:OnChanged(function()
+    getgenv().AutoDoGoldUpgradeA = Options.DoGoldUpgradeAuto.Value
+
+    if getgenv().AutoDoGoldUpgradeA then
+        AutoDoGoldUpgradeALoop()
+    else
+        getgenv().AutoDoGoldUpgradeA = false
+    end
+end)
+
+function AutoDoGoldUpgradeALoop()
+    spawn(function()
+        while getgenv().AutoDoGoldUpgradeA do 
+            wait(0.1) 
+            
+            local upgradeToUse, cost = findCheapestAffordableUpgrade()
+            
+            if upgradeToUse then
+                game:GetService("ReplicatedStorage").Communication.DoGoldUpgrade:FireServer(upgradeToUse)
+                wait(0.5) 
+            else
+                wait(1)
+            end
+        end
+    end)
+end
+
+
+
+end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/NoGame.lua"))()

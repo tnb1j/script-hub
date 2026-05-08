@@ -1,0 +1,1189 @@
+getgenv().Tabs = nil
+getgenv().Options = nil
+getgenv().Window = nil
+getgenv().Toggle = nil
+getgenv().Value = nil
+
+getgenv().GameName = "PETS GO"
+
+if getgenv().ScriptGe then
+    getgenv().ScriptGe = nil
+end
+
+getgenv().ScriptGe = function()
+
+Tabs.Gameworks:AddSection("Auto")
+
+local Slider = Tabs.Gameworks:AddSlider("Slider", {
+    Title = "Speed Wait Eggs Roll",
+    Description = "Speed Wait to Eggs Roll",
+    Default = 0.3, 
+    Min = 0,    
+    Max = 10,  
+    Rounding = 1, 
+    Callback = function(Value)
+        getgenv().SpeedEggs = Value
+    end
+})
+
+
+local Toggle = Tabs.Gameworks:AddToggle("Eggs_RollsValue", {Title = "Auto Eggs Roll", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().Eggs_Roll = Options.Eggs_RollsValue.Value
+
+    if getgenv().Eggs_Roll then
+        startEggsRollLoop()
+    else
+        getgenv().Eggs_Roll = false
+    end
+end)
+
+function startEggsRollLoop()
+    spawn(function()
+        while getgenv().Eggs_Roll do 
+            wait(SpeedEggs)
+            game:GetService("ReplicatedStorage").Network.Eggs_Roll:InvokeServer()
+        end
+    end)
+end
+
+local Toggle = Tabs.Gameworks:AddToggle("Eggs_CLAIMValue", {Title = "Auto Claim Roll", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().Eggs_Claim = Options.Eggs_CLAIMValue.Value
+
+    if getgenv().Eggs_Claim then
+        startEggsClaimLoop()
+    else
+        getgenv().Eggs_Claim = false
+    end
+end)
+
+function startEggsClaimLoop()
+    spawn(function()
+        while getgenv().Eggs_Claim do 
+            wait(3)
+local timerText = workspace.MAP.INTERACT.RetentionDice.Billboard.BillboardGui.Timer
+
+if timerText.Text == "CLAIM NOW!" then
+game:GetService("ReplicatedStorage").Network:FindFirstChild("Bonus Rolls: Claim"):InvokeServer()
+end
+        end
+    end)
+end
+
+local Toggle = Tabs.Gameworks:AddToggle("Fishing_Fish", {Title = "Auto Fishing Fish", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoFishing_Fish = Options.Fishing_Fish.Value
+
+    if getgenv().AutoFishing_Fish then
+        startFishing_FishLoop()
+    else
+        getgenv().AutoFishing_Fish = false
+    end
+end)
+
+function startFishing_FishLoop()
+    spawn(function()
+        while getgenv().AutoFishing_Fish do 
+            wait(1)
+            game:GetService("ReplicatedStorage").Network.Fishing_Fish:InvokeServer()
+            wait(0.1)
+            game:GetService("ReplicatedStorage").Network.Fishing_Success:FireServer()
+        end
+    end)
+end
+
+
+
+
+local Slider = Tabs.Gameworks:AddSlider("Slider", {
+    Title = "Process Upgrades Speed",
+    Description = "Increase the speed of process refresh or update rate",    
+    Default = 1, 
+    Min = 0,    
+    Max = 10,  
+    Rounding = 1, 
+    Callback = function(Value)
+        getgenv().SpeedUpgrades = Value
+    end
+})
+
+local Toggle = Tabs.Gameworks:AddToggle("UpgradesValue", {Title = "Auto Upgrades", Description = "Upgrades must also be open. If you want to specify Upgrades, just click on something and it will be done automatically.", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().Upgrades = Options.UpgradesValue.Value
+
+    if getgenv().Upgrades then
+        startUpgradesRollLoop()
+    else
+        getgenv().Upgrades = false
+    end
+end)
+
+function startUpgradesRollLoop()
+    spawn(function()
+        while getgenv().Upgrades do
+            local upgradesFolder = workspace:FindFirstChild("__THINGS") and workspace.__THINGS:FindFirstChild("Upgrades") and workspace.__THINGS.Upgrades:FindFirstChild("Upgrades Frontend Render")
+
+            if upgradesFolder then
+  
+
+                local function convertShortenedNumber(shortened)
+                    if string.find(shortened, "k") then
+                        local number = string.gsub(shortened, "k", "")
+                        return tonumber(number) * 1000
+                    elseif string.find(shortened, "m") then
+                        local number = string.gsub(shortened, "m", "")
+                        return tonumber(number) * 1000000
+                    elseif string.find(shortened, "b") then
+                        local number = string.gsub(shortened, "b", "")
+                        return tonumber(number) * 1000000000
+                    else
+                        return tonumber(shortened)
+                    end
+                end
+                
+                local lowestPrice = math.huge
+                local lowestUpgradeName = nil
+                
+                for _, upgrade in pairs(upgradesFolder:GetChildren()) do
+                    if upgrade:FindFirstChild("Price") and upgrade.Price:FindFirstChild("SurfaceGui") and upgrade.Price.SurfaceGui:FindFirstChild("Price") then
+                        local priceLabel = upgrade.Price.SurfaceGui.Price
+                        local priceText = convertShortenedNumber(priceLabel.ContentText)
+                        
+                        if priceText and priceText < lowestPrice then
+                            lowestPrice = priceText
+                            lowestUpgradeName = upgrade.Name
+                        end
+                    end
+                end
+                
+                if lowestUpgradeName then
+                    local args = {
+                        [1] = lowestUpgradeName
+                    }
+                
+                    game:GetService("ReplicatedStorage").Network.Upgrades_Purchase:InvokeServer(unpack(args))
+                end
+            end
+
+            wait(SpeedUpgrades)
+        end
+    end)
+end
+
+
+local MultiDropdown = Tabs.Gameworks:AddDropdown("MultiDropdown", {
+    Title = "Select Collectable Type",
+    Description = "Choose to collect Orbs, Fruits, or both.",
+    Values = {"Orb", "Fruit"},
+    Multi = true,
+    Default = {"Orb", "Fruit"}, 
+})
+
+MultiDropdown:SetValue({
+    Orb = true,
+    Fruit = true
+})
+
+local Toggle = Tabs.Gameworks:AddToggle("orbValue", {Title = "Auto Collect", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().orbValues = Options.orbValue.Value
+
+    if getgenv().orbValues then
+        startCollectingLoop()
+    else
+        getgenv().orbValues = false
+    end
+end)
+
+function startCollectingLoop()
+    spawn(function()
+        while wait() do
+            if getgenv().orbValues and MultiDropdown.Value["Orb"] then
+                collectOrbs()
+            end
+            
+            if getgenv().orbValues and MultiDropdown.Value["Fruit"] then
+                collectFruits()
+            end
+        end
+    end)
+end
+
+function collectOrbs()
+    local orbsFolder = workspace.__THINGS.Orbs
+
+    local orbNumbers = {}
+    for _, orb in pairs(orbsFolder:GetChildren()) do
+        table.insert(orbNumbers, orb.Name)
+    end
+    
+    for _, orbNumber in pairs(orbNumbers) do
+        local args = {
+            [1] = {
+                [1] = tonumber(orbNumber)
+            }
+        }
+    
+        game:GetService("ReplicatedStorage").Network:FindFirstChild("Orbs: Collect"):FireServer(unpack(args))
+    
+        local orbToRemove = orbsFolder:FindFirstChild(orbNumber)
+        if orbToRemove then
+            orbToRemove:Destroy()
+        end
+    end
+end
+
+function collectFruits()
+    local breakablesFolder = workspace.__THINGS.Breakables
+
+    for _, breakable in pairs(breakablesFolder:GetChildren()) do
+        local base = breakable:FindFirstChild("base")
+        
+        if base then
+            local hitbox = base:FindFirstChild("Hitbox")
+            
+            if hitbox then
+                if hitbox:FindFirstChild("TouchInterest") then
+                    spawn(function()
+                        firetouchinterest(game.Players.LocalPlayer.Character.HumanoidRootPart, hitbox, 0)
+                        firetouchinterest(game.Players.LocalPlayer.Character.HumanoidRootPart, hitbox, 1)
+                    end)
+                end
+            end
+        end
+    end    
+end
+
+startCollectingLoop()
+
+    Tabs.Gameworks:AddSection("Farm")
+
+    local Slider = Tabs.Gameworks:AddSlider("Slider", {
+        Title = "Speed Wait Auto Farm Orbs",
+        Description = "Adjust the speed at which pets switch between targets during auto farming",
+        Default = 0.3, 
+        Min = 0,    
+        Max = 10,  
+        Rounding = 1, 
+        Callback = function(Value)
+            getgenv().SpeedAutoFarmOrbs = Value
+        end
+    })
+
+    local Dropdown = Tabs.Gameworks:AddDropdown("FarmMode", {
+        Title = "Farming Mode",
+        Values = {"Random", "All Pets Target One"},
+        Multi = false,
+        Default = 1,
+    })
+    
+    Dropdown:SetValue("Random")
+    
+    Dropdown:OnChanged(function(Value)
+        getgenv().FarmMode = Value
+    end)
+    
+    local Toggle = Tabs.Gameworks:AddToggle("AutoFarmorbs", {Title = "Auto Farm Orbs", Default = false})
+
+    Toggle:OnChanged(function()
+        getgenv().AutoFarmorb = Options.AutoFarmorbs.Value
+    
+        if getgenv().AutoFarmorb then
+            startAutoFarmorbRollLoop()
+        else
+            getgenv().AutoFarmorb = false
+        end
+    end)
+    
+    function startAutoFarmorbRollLoop()
+        spawn(function()
+            while wait(SpeedAutoFarmOrbs) do
+                if getgenv().AutoFarmorb then
+                    local petsFolder = workspace.__THINGS.Pets
+                    local breakablesFolder = workspace.__THINGS.Breakables
+                    
+                    local petNames = {}
+                    for _, pet in pairs(petsFolder:GetChildren()) do
+                        if tonumber(pet.Name) then  
+                            table.insert(petNames, pet.Name)
+                        end
+                    end
+                    
+                    local breakableNumbers = {}
+                    for _, breakable in pairs(breakablesFolder:GetChildren()) do
+                        if breakable:FindFirstChild("base") == nil and tonumber(breakable.Name) then
+                            table.insert(breakableNumbers, breakable.Name)
+                        end
+                    end
+    
+                    if #petNames == 0 or #breakableNumbers == 0 then
+                        repeat
+                            wait(1)
+                            
+                            petNames = {}
+                            for _, pet in pairs(petsFolder:GetChildren()) do
+                                if tonumber(pet.Name) then  
+                                    table.insert(petNames, pet.Name)
+                                end
+                            end
+                            
+                            breakableNumbers = {}
+                            for _, breakable in pairs(breakablesFolder:GetChildren()) do
+                                if breakable:FindFirstChild("base") == nil and tonumber(breakable.Name) then
+                                    table.insert(breakableNumbers, breakable.Name)
+                                end
+                            end
+                        until #petNames > 0 and #breakableNumbers > 0
+                    end
+    
+                    if getgenv().FarmMode == "Random" then
+                        for _, petName in ipairs(petNames) do
+                            local randomBreakableNumber = breakableNumbers[math.random(#breakableNumbers)]
+                            local args = {
+                                [1] = {
+                                    [petName] = tonumber(randomBreakableNumber)
+                                }
+                            }
+                            game:GetService("ReplicatedStorage").Network.Breakables_JoinPetBulk:FireServer(unpack(args))
+                        end
+                    elseif getgenv().FarmMode == "All Pets Target One" then
+                        local targetBreakableNumber = breakableNumbers[math.random(#breakableNumbers)]
+                        for _, petName in ipairs(petNames) do
+                            local args = {
+                                [1] = {
+                                    [petName] = tonumber(targetBreakableNumber)
+                                }
+                            }
+                            game:GetService("ReplicatedStorage").Network.Breakables_JoinPetBulk:FireServer(unpack(args))
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    local Toggle = Tabs.Gameworks:AddToggle("FlyingGiftsValue", {Title = "Auto Farm FlyingGifts", Description = "You must have slingshot skills.", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().FlyingGiftsl = Options.FlyingGiftsValue.Value
+
+    if getgenv().FlyingGiftsl then
+        startFlyingGiftsLoop()
+    else
+        getgenv().FlyingGiftsl = false
+    end
+end)
+
+function startFlyingGiftsLoop()
+    spawn(function()
+        while getgenv().FlyingGiftsl do 
+            wait(1)
+            local player = game:GetService("Players").LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()  
+            local rootPart = character:WaitForChild("HumanoidRootPart")
+            
+            local flyingGifts = workspace:WaitForChild("__THINGS"):WaitForChild("FlyingGifts")
+            
+            local function updateFlyingGiftsCFrame()
+                for _, model in pairs(flyingGifts:GetChildren()) do
+                    if model:FindFirstChild("Balloon") then
+                        local newPosition = rootPart.Position + Vector3.new(0, 20, 0)
+                        model.Balloon.CFrame = CFrame.new(newPosition)
+                    end
+                end
+            end
+            
+            if #flyingGifts:GetChildren() > 0 then
+                updateFlyingGiftsCFrame()
+            end
+        end
+    end)
+end
+
+    
+    
+
+    Tabs.Gameworks:AddSection("Buy")
+
+
+    Tabs.Gameworks:AddButton({
+        Title = "Potion Vending Machine",
+         Callback = function()
+            local args = {
+                [1] = "PotionVendingMachine"
+            }
+            
+            game:GetService("ReplicatedStorage").Network.VendingMachines_Purchase:InvokeServer(unpack(args))            
+        end
+    })
+
+    local Toggle = Tabs.Gameworks:AddToggle("PotionVendingMachineValue", {Title = "Auto Potion Vending Machine", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoPotionVendingMachine = Options.PotionVendingMachineValue.Value
+
+    if getgenv().AutoPotionVendingMachine then
+        AutoPotionVendingMachineLoop()
+    else
+        getgenv().AutoPotionVendingMachine = false
+    end
+end)
+
+function AutoPotionVendingMachineLoop()
+    spawn(function()
+        while getgenv().AutoPotionVendingMachine do 
+            wait(3)
+            local args = {
+                [1] = "PotionVendingMachine"
+            }
+            
+            game:GetService("ReplicatedStorage").Network.VendingMachines_Purchase:InvokeServer(unpack(args))     
+        end
+    end)
+end
+
+
+Tabs.Gameworks:AddParagraph({
+    Title = "WARNING!",
+    Content = "Please open the Potion Crafting GUI before using this feature. If the GUI is already open, press the refresh button to update the items. No need to restart the script."
+})
+
+getgenv().craftingItems = {}
+getgenv().itemNumbers = {}
+
+local function refreshCraftingItems()
+    getgenv().craftingItems = {}
+    getgenv().itemNumbers = {}
+
+    local contentFrame = game:GetService("Players").LocalPlayer.PlayerGui._MACHINES.CraftingMachine.Frame.UsingFrame.Content
+
+    for _, item in pairs(contentFrame:GetChildren()) do
+        local itemNumber = tonumber(item.Name)
+        if itemNumber then
+            local itemName = item.TextLabel.Text
+            getgenv().craftingItems[itemName] = itemNumber
+            table.insert(getgenv().itemNumbers, itemNumber)
+        end
+    end
+
+    table.sort(getgenv().itemNumbers)
+
+    local sortedCraftingItems = {}
+    for _, number in ipairs(getgenv().itemNumbers) do
+        for itemName, itemNumber in pairs(getgenv().craftingItems) do
+            if itemNumber == number then
+                table.insert(sortedCraftingItems, itemName)
+                break
+            end
+        end
+    end
+
+    return sortedCraftingItems
+end
+
+local sortedItems = refreshCraftingItems()
+
+local Dropdown = Tabs.Gameworks:AddDropdown("CraftingItemDropdown", {
+    Title = "Select Crafting Item",
+    Description = "Select the crafting item you want to create.",
+    Values = sortedItems, 
+    Multi = false,
+    Default = "Select",
+})
+
+Tabs.Gameworks:AddButton({
+    Title = "Refresh Items",
+    Callback = function()
+        local newSortedItems = refreshCraftingItems()
+
+        Dropdown:SetValues(newSortedItems)
+    end
+})
+
+Tabs.Gameworks:AddButton({
+    Title = "Potion Crafting",
+    Callback = function()
+        local selectedItem = Dropdown.Value 
+        local selectedCode = getgenv().craftingItems[selectedItem]
+
+        if selectedCode then
+            local args = {
+                [1] = "PotionCraftingMachine",
+                [2] = selectedCode,
+                [3] = 1
+            }
+
+            game:GetService("ReplicatedStorage").Network.CraftingMachine_Craft:InvokeServer(unpack(args))
+        end
+    end
+})
+
+local Toggle = Tabs.Gameworks:AddToggle("AutoPotionCraftingToggle", {Title = "Auto Potion Crafting", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoPotionCrafting = Toggle.Value
+
+    if getgenv().AutoPotionCrafting then
+        startPotionCraftingMachineLoop()
+    else
+        getgenv().AutoPotionCrafting = false
+    end
+end)
+
+function startPotionCraftingMachineLoop()
+    spawn(function()
+        while getgenv().AutoPotionCrafting do
+            wait(0.5)
+
+            local selectedItem = Dropdown.Value
+            local selectedCode = getgenv().craftingItems[selectedItem]
+
+            if selectedCode then
+                local args = {
+                    [1] = "PotionCraftingMachine",
+                    [2] = selectedCode,
+                    [3] = 1
+                }
+
+                game:GetService("ReplicatedStorage").Network.CraftingMachine_Craft:InvokeServer(unpack(args))
+            end
+        end
+    end)
+end
+
+
+local indexShopPurchases = {
+    { "AdvancedIndexMerchant", 1 },
+    { "AdvancedIndexMerchant", 2 },
+    { "AdvancedIndexMerchant", 3 },
+    { "AdvancedIndexMerchant", 4 },
+    { "AdvancedIndexMerchant", 5 },
+    { "AdvancedIndexMerchant", 6 }
+}
+
+Tabs.Gameworks:AddButton({
+    Title = "Buy All Index Shop Potions",
+    Callback = function()
+        for _, purchase in ipairs(indexShopPurchases) do
+            local args = {
+                [1] = purchase[1],
+                [2] = purchase[2]
+            }
+
+            game:GetService("ReplicatedStorage").Network.Merchant_RequestPurchase:InvokeServer(unpack(args))
+        end
+    end
+})
+
+local Toggle = Tabs.Gameworks:AddToggle("AutoindexShopPurchasesValue", {Title = "Auto Buy All Index Shop Potions", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoindexShopPurchases = Options.AutoindexShopPurchasesValue.Value
+
+    if getgenv().AutoindexShopPurchases then
+        AutoindexShopPurchasesLoop()
+    else
+        getgenv().AutoindexShopPurchases = false
+    end
+end)
+
+function AutoindexShopPurchasesLoop()
+    spawn(function()
+        while getgenv().AutoindexShopPurchases do 
+            wait(3)
+            for _, purchase in ipairs(indexShopPurchases) do
+                local args = {
+                    [1] = purchase[1],
+                    [2] = purchase[2]
+                }
+    
+                game:GetService("ReplicatedStorage").Network.Merchant_RequestPurchase:InvokeServer(unpack(args))
+            end
+        end
+    end)
+end
+
+local FishMerchantsPurchases = {
+    { "FishingMerchant", 1 },
+    { "FishingMerchant", 2 },
+    { "FishingMerchant", 3 },
+    { "FishingMerchant", 4 },
+    { "FishingMerchant", 5 },
+    { "FishingMerchant", 6 }
+}
+
+Tabs.Gameworks:AddButton({
+    Title = "Buy All Fish Merchants",
+    Callback = function()
+        for _, purchase in ipairs(FishMerchantsPurchases) do
+            local args = {
+                [1] = purchase[1],
+                [2] = purchase[2]
+            }
+
+            game:GetService("ReplicatedStorage").Network.CustomMerchants_Purchase:InvokeServer(unpack(args))
+        end
+    end
+})
+
+local Toggle = Tabs.Gameworks:AddToggle("AutoFishMerchantsValue", {Title = "Auto Buy All Fish Merchants", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoFishMerchants = Options.AutoFishMerchantsValue.Value
+
+    if getgenv().AutoFishMerchants then
+        AutoFishMerchantsLoop()
+    else
+        getgenv().AutoFishMerchants = false
+    end
+end)
+
+function AutoFishMerchantsLoop()
+    spawn(function()
+        while getgenv().AutoFishMerchants do 
+            wait(3)
+            for _, purchase in ipairs(FishMerchantsPurchases) do
+                local args = {
+                    [1] = purchase[1],
+                    [2] = purchase[2]
+                }
+    
+                game:GetService("ReplicatedStorage").Network.CustomMerchants_Purchase:InvokeServer(unpack(args))
+             end
+        end
+    end)
+end
+
+local StandardMerchantShopPurchases = {
+    { "StandardMerchant", 1 },
+    { "StandardMerchant", 2 },
+    { "StandardMerchant", 3 },
+    { "StandardMerchant", 4 },
+    { "StandardMerchant", 5 },
+    { "StandardMerchant", 6 }
+}
+
+Tabs.Gameworks:AddButton({
+    Title = "Buy All Merchant",
+    Callback = function()
+        for _, purchase in ipairs(StandardMerchantShopPurchases) do
+            local args = {
+                [1] = purchase[1],
+                [2] = purchase[2]
+            }
+
+            game:GetService("ReplicatedStorage").Network.CustomMerchants_Purchase:InvokeServer(unpack(args))
+        end
+    end
+})
+
+local Toggle = Tabs.Gameworks:AddToggle("AutoMerchantValue", {Title = "Auto Buy Merchant", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().AutoMerchant = Options.AutoMerchantValue.Value
+
+    if getgenv().AutoMerchant then
+        AutoAutoMerchantLoop()
+    else
+        getgenv().AutoMerchant = false
+    end
+end)
+
+function AutoAutoMerchantLoop()
+    spawn(function()
+        while getgenv().AutoMerchant do 
+            wait(3)
+            for _, purchase in ipairs(StandardMerchantShopPurchases) do
+                local args = {
+                    [1] = purchase[1],
+                    [2] = purchase[2]
+                }
+    
+                game:GetService("ReplicatedStorage").Network.CustomMerchants_Purchase:InvokeServer(unpack(args))
+            end
+        end
+    end)
+end
+
+
+    Tabs.Gameworks:AddSection("Boosts")
+
+    local fruits = {
+        ["Fruit_Rainbow"] = "0176f62846ba492fa14ad6ebb44fb0f5",
+        ["Fruit_Apple"] = "5d1bac4b437440e1be4a65d7d316647d", 
+        ["Fruit_Banana"] = "620b1190c9894d44a285080967ab8935", 
+        ["Fruit_Orange"] = "152aea2631de45dca7f00e2115fd8b3e", 
+        ["Fruit_Pineapple"] = "b5812bbeddd5431d98ac7e2ba0bcd7e3", 
+        ["Fruit_Watermelon"] = "e66b62370a5a4a65bfe59f4b444c7c18", 
+    }
+    
+    local fruitsShiny = {
+        ["Fruit_Rainbow"] = "9cfb9670c33a4aeaadf12d651874c602",
+        ["Fruit_Apple"] = "f2621460a4744889a894a716c7297df1", 
+        ["Fruit_Banana"] = "97838cf87db040b4b40f1ccdf9525876", 
+        ["Fruit_Orange"] = "d36122a297e04c30bff3531157104180", 
+        ["Fruit_Pineapple"] = "5684c801195c43c5b2a7c0bbbd1c11cd", 
+        ["Fruit_Watermelon"] = "6b9cc8b67e2a4f7893f47f00b14b6418", 
+    }
+    
+    local useShinyFruits = false
+    
+    local MultiDropdown = Tabs.Gameworks:AddDropdown("MultiFruitDropdown", {
+        Title = "Select Fruits",
+        Description = "You can select multiple fruits.",
+        Values = {"Fruit_Rainbow", "Fruit_Apple", "Fruit_Banana", "Fruit_Orange", "Fruit_Pineapple", "Fruit_Watermelon"},
+        Multi = true, 
+        Default = {"Fruit_Rainbow"}, 
+    })
+    
+    MultiDropdown:SetValue({
+        Fruit_Rainbow = true,
+        Fruit_Apple = false,
+        Fruit_Banana = false,
+        Fruit_Orange = false,
+        Fruit_Pineapple = false,
+        Fruit_Watermelon = false,
+    })
+    
+    local Slider = Tabs.Gameworks:AddSlider("Slider", {
+        Title = "Select Amount fruits",
+        Description = "Choose the number of fruits to consume",
+        Default = 1, 
+        Min = 1,    
+        Max = 30,  
+        Rounding = 1, 
+        Callback = function(Value)
+            getgenv().fruitsnumber = math.floor(Value)
+        end
+    })
+    
+    function AutoFruitConsumptionLoop()
+        spawn(function()
+            while getgenv().AutoFruitConsumption do 
+                wait(3) 
+        
+                local boostsFolder = game:GetService("Players").LocalPlayer.PlayerGui.Main.Boosts.Inner
+        
+                if not boostsFolder then
+                    return
+                end
+        
+                local selectedFruitsList = useShinyFruits and fruitsShiny or fruits
+        
+                for fruitName, state in next, MultiDropdown.Value do
+                    if state then
+                        local fruitCode = selectedFruitsList[fruitName]
+                        if fruitCode then
+                            if not boostsFolder:FindFirstChild(fruitName) then
+                                local args = {
+                                    [1] = fruitCode,
+                                    [2] = getgenv().fruitsnumber 
+                                }
+                                game:GetService("ReplicatedStorage").Network:FindFirstChild("Fruits: Consume"):InvokeServer(unpack(args))
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    
+    Tabs.Gameworks:AddButton({
+        Title = "Consume Selected Fruits", 
+        Callback = function()
+            local selectedFruits = {}
+            for fruitName, state in next, MultiDropdown.Value do
+                if state then
+                    table.insert(selectedFruits, fruitName)
+                end
+            end
+        
+            local amount = getgenv().fruitsnumber 
+        
+            local selectedFruitsList = useShinyFruits and fruitsShiny or fruits 
+        
+            for _, fruitName in ipairs(selectedFruits) do
+                local fruitCode = selectedFruitsList[fruitName] 
+                if fruitCode then
+                    local args = {
+                        [1] = fruitCode,
+                        [2] = amount
+                    }
+                    game:GetService("ReplicatedStorage").Network:FindFirstChild("Fruits: Consume"):InvokeServer(unpack(args))
+                end
+            end
+        end
+    })
+    
+    local ToggleShiny = Tabs.Gameworks:AddToggle("UseShinyFruitsToggle", {Title = "Use Shiny Fruits", Default = false})
+    
+    ToggleShiny:OnChanged(function()
+        useShinyFruits = ToggleShiny.Value
+    end)
+    
+    local Toggle = Tabs.Gameworks:AddToggle("AutoFruitConsumptionToggle", {Title = "Auto Fruit Consumption", Default = false})
+    
+    Toggle:OnChanged(function()
+        getgenv().AutoFruitConsumption = Toggle.Value
+    
+        if getgenv().AutoFruitConsumption then
+            AutoFruitConsumptionLoop()
+        else
+            getgenv().AutoFruitConsumption = false
+        end
+    end)    
+
+    Tabs.Gameworks:AddSection("Fish")
+
+local oldNamecall = nil
+
+getgenv().lastBait = "Nothing" 
+getgenv().lastChest = "Nothing" 
+
+local function convertToNumber(input)
+    if type(input) == "string" then
+        local number = tonumber(input:sub(1, -2)) 
+        local suffix = input:sub(-1)
+        
+        if suffix == "k" then
+            return number * 1000 
+        elseif suffix == "m" then
+            return number * 1000000
+        else
+            return tonumber(input)
+        end
+    end
+    return input
+end
+
+local BaitInput = Tabs.Gameworks:AddInput("BaitInput", {
+    Title = "Bait Input",
+    Default = "1", 
+    Placeholder = "Enter Number",
+    Numeric = true, 
+    Finished = false, 
+    Callback = function(Value)
+        getgenv().lastNumber = convertToNumber(Value) or 1
+    end
+})
+
+Tabs.Gameworks:AddButton({
+    Title = "Confirm Input Bait",
+    Callback = function()
+        local inputValue = getgenv().lastNumber or 1
+
+        local args = {
+            [1] = getgenv().lastBait,
+            [2] = inputValue 
+        }
+
+        game:GetService("ReplicatedStorage").Network.Consumables_Consume:InvokeServer(unpack(args))
+
+    end
+})
+
+local ChestInput = Tabs.Gameworks:AddInput("ChestInput", {
+    Title = "Chest Input",
+    Default = "1", 
+    Placeholder = "Enter Lootbox Number",
+    Numeric = true, 
+    Finished = false,
+    Callback = function(Value)
+        getgenv().lastChestNumber = convertToNumber(Value) or 1
+    end
+})
+
+Tabs.Gameworks:AddButton({
+    Title = "Confirm Input Chest", 
+    Callback = function()
+        local chestValue = getgenv().lastChestNumber or 1
+
+        local args = {
+            [1] = getgenv().lastChest,
+            [2] = chestValue 
+        }
+
+        game:GetService("ReplicatedStorage").Network:FindFirstChild("Lootbox: Open"):InvokeServer(unpack(args))
+    end
+})
+
+local Toggle = Tabs.Gameworks:AddToggle("Confirm_Input_Chest", {Title = "Auto Confirm Input Chest", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().Input_Chest = Options.Confirm_Input_Chest.Value
+
+    if getgenv().Input_Chest then
+        startInput_ChestLoop()
+    else
+        getgenv().Input_Chest = false
+    end
+end)
+
+function startInput_ChestLoop()
+    spawn(function()
+        while getgenv().Input_Chest do 
+            wait(.1)
+            local chestValue = getgenv().lastChestNumber or 1
+
+            local args = {
+                [1] = getgenv().lastChest,
+                [2] = chestValue 
+            }
+    
+            game:GetService("ReplicatedStorage").Network:FindFirstChild("Lootbox: Open"):InvokeServer(unpack(args))
+        end
+    end)
+end
+
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if method == "InvokeServer" and tostring(self) == "Consumables_Consume" then
+        if args[1] then
+            getgenv().lastBait = args[1]  
+        end
+    end
+
+    if method == "InvokeServer" and tostring(self) == "Lootbox: Open" then
+        if args[1] then
+            getgenv().lastChest = args[1] 
+        end
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+
+    Tabs.Gameworks:AddSection("Pets Equip")
+    
+    getgenv().inputValue = nil
+    getgenv().numberValue = 1
+    getgenv().rarityValue = 1
+    
+    local Input = Tabs.Gameworks:AddInput("code Pets", {
+        Title = "Code Pets",
+        Default = "",
+        Placeholder = "9d72f9495cde4cc5b64bd1cdc52ce50b",
+        Numeric = false,
+        Finished = false,
+        Callback = function(Value)
+            local extractedText = Value:match('"(.-)"') or Value
+            getgenv().inputValue = extractedText
+        end
+    })
+    
+local DropdownValues = {}
+local DisplayValues = {}
+
+    local Dropdown = Tabs.Gameworks:AddDropdown("Dropdown", {
+        Title = "Pets Dropdown Equip",
+        Values = DisplayValues,
+        Multi = false,
+        Default = nil,
+    })
+
+local function updateDropdownDisplay()
+    DisplayValues = {}
+    
+    for _, pet in ipairs(DropdownValues) do
+        table.insert(DisplayValues, pet.id .. ", Repeat: " .. pet.repeatCount .. ", Rarity: " .. pet.rarity)
+    end
+    
+    Dropdown:SetValues(DisplayValues)
+end
+    
+    
+Tabs.Gameworks:AddButton({
+    Title = "Add to Dropdown",
+    Callback = function()
+        if getgenv().inputValue then
+            local exists = false
+            
+            for _, pet in ipairs(DropdownValues) do
+                if pet.id == getgenv().inputValue then
+                    exists = true
+                    break
+                end
+            end
+
+            if not exists then
+                local newPet = {id = getgenv().inputValue, repeatCount = getgenv().numberValue or 1, rarity = getgenv().rarityValue or 1}
+                table.insert(DropdownValues, newPet)
+                updateDropdownDisplay()  
+
+                Fluent:Notify({
+                    Title = "7yd7 | Notification",
+                    Content = "Added pet ID: " .. getgenv().inputValue,
+                    Duration = 5
+                })
+            else
+                Fluent:Notify({
+                    Title = "7yd7 | Warning",
+                    Content = "Pet ID already exists in the dropdown!",
+                    Duration = 5
+                })
+            end
+        else
+            Fluent:Notify({
+                Title = "7yd7 | Warning",
+                Content = "No input text to add!",
+                Duration = 5
+            })
+        end
+    end
+})
+
+    Tabs.Gameworks:AddButton({
+        Title = "Remove Selected Pet",
+        Callback = function()
+            local selectedPet = Dropdown.Value
+            
+            if selectedPet then
+                local petId = selectedPet:match("^(.-),")
+                for index, pet in ipairs(DropdownValues) do
+                    if pet.id == petId then
+                        table.remove(DropdownValues, index)
+                        updateDropdownDisplay()
+                        Fluent:Notify({
+                            Title = "7yd7 | Notification",
+                            Content = "Removed pet ID: " .. petId,
+                            Duration = 5
+                        })
+                        break
+                    end
+                end
+            else
+                Fluent:Notify({
+                    Title = "7yd7 | Warning",
+                    Content = "No pet selected for removal!",
+                    Duration = 5
+                })
+            end
+        end
+    })
+    
+    local NumberInputRepeat = Tabs.Gameworks:AddInput("Repeat Count", {
+        Title = "Repeat Count",
+        Default = "",
+        Placeholder = "Enter repeat count",
+        Numeric = true,
+        Finished = false,
+        Callback = function(Value)
+            getgenv().numberValue = tonumber(Value) or 1
+        end
+    })
+    
+    local NumberInputRarity = Tabs.Gameworks:AddInput("Rarity", {
+        Title = "Rarity",
+        Default = "",
+        Placeholder = "Enter rarity",
+        Numeric = false,
+        Finished = true,
+        Callback = function(Value)
+
+            if Value:match("^[%d%.]+$") or Value:match("[kmb]$") then
+                getgenv().rarityValue = Value 
+            else
+                Fluent:Notify({
+                    Title = "7yd7 | Warning",
+                    Content = "Select a pet and enter valid values!",
+                    Duration = 5
+                })
+                getgenv().rarityValue = 1
+            end
+        end
+    })
+    
+    Tabs.Gameworks:AddButton({
+        Title = "Apply Values to Selected Pet",
+        Callback = function()
+            local selectedPet = Dropdown.Value
+            
+            if selectedPet and getgenv().numberValue and getgenv().rarityValue then
+                local petId = selectedPet:match("^(.-),")
+                for _, pet in ipairs(DropdownValues) do
+                    if pet.id == petId then
+                        pet.repeatCount = getgenv().numberValue
+                        pet.rarity = getgenv().rarityValue
+                        updateDropdownDisplay()
+                        Fluent:Notify({
+                            Title = "7yd7 | Notification",
+                            Content = "Updated pet: " .. pet.id .. " | Repeat: " .. pet.repeatCount .. " | Rarity: " .. pet.rarity,
+                            Duration = 5
+                        })
+                        break
+                    end
+                end
+            else
+                Fluent:Notify({
+                    Title = "7yd7 | Warning",
+                    Content = "Select a pet and enter valid values!",
+                    Duration = 5
+                })
+            end
+        end
+    })
+    
+    
+Tabs.Gameworks:AddButton({
+    Title = "Copy Script",
+    Description = "Copy the script to use it in Autoexec.",
+    Callback = function()
+        if #DropdownValues == 0 then
+            Fluent:Notify({
+                Title = "7yd7 | Warning",
+                Content = "No data to copy!",
+                Duration = 5
+            })
+            return
+        end
+
+        local clipboardText = 'getgenv().petsToEquip = {\n'
+        for _, pet in ipairs(DropdownValues) do
+            local rarityValue = pet.rarity
+            
+            if tostring(rarityValue):match("%a") then
+                clipboardText = clipboardText .. string.format('    {id = "%s", repeatCount = %d, rarity = "%s"},\n', pet.id, pet.repeatCount, rarityValue)
+            else
+                clipboardText = clipboardText .. string.format('    {id = "%s", repeatCount = %d, rarity = %d},\n', pet.id, pet.repeatCount, rarityValue)
+            end
+        end
+        clipboardText = clipboardText .. '}\n\nloadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/Autoexec/PETS-GO"))()'
+
+        setclipboard(clipboardText)
+        Fluent:Notify({
+            Title = "7yd7 | Notification",
+            Content = "Script copied to clipboard.",
+            Duration = 5
+        })
+    end
+})
+
+Tabs.Gameworks:AddSection("Autoexec script (differentiation between local script)")
+
+
+Tabs.Gameworks:AddButton({
+    Title = "Copy Script",
+    Description = "Copy the script to use it in Autoexec.",
+    Callback = function()
+
+        local clipboardText = '--[[\nSimple script to rejoin the Claim Roll topic\nChange the [number] to a lucky number or a percentage as you call it\nExample: 50000\nIf you want more than one thing just put 10-1000 | it will be 10 to 10,000\n]]\ngetgenv().targetValue = "number"\nloadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/Autoexec/PETS-GO%7Crejoin%7CRollClaim"))()'
+
+        setclipboard(clipboardText)
+        Fluent:Notify({
+            Title = "7yd7 | Notification",
+            Content = "Script copied to clipboard.",
+            Duration = 5
+        })
+    end
+})
+end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/NoGame.lua"))()
