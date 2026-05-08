@@ -88,6 +88,7 @@ if getgenv().GameName then
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
         Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
         Listener = Window:AddTab({ Title = "Listener", Icon = "terminal" }),
+        Executor = Window:AddTab({ Title = "Executor", Icon = "code" }),
         Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
         game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
@@ -99,6 +100,7 @@ else
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
         Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
         Listener = Window:AddTab({ Title = "Listener", Icon = "terminal" }),
+        Executor = Window:AddTab({ Title = "Executor", Icon = "code" }),
         Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
         game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
@@ -882,9 +884,12 @@ do
         end)
     end
 
-    Tabs.Listener:AddSection("Console / LogService Output")
+    -- =====================================
+    -- UI: EXECUTOR TAB
+    -- =====================================
+    Tabs.Executor:AddSection("Console / LogService Output")
 
-    local LogParagraph = Tabs.Listener:AddParagraph({ Title = "Game Logs", Content = "Waiting for logs..." })
+    local LogParagraph = Tabs.Executor:AddParagraph({ Title = "Game Logs", Content = "Waiting for logs..." })
     getgenv().HubGameLogs = {}
 
     local LogService = game:GetService("LogService")
@@ -894,7 +899,7 @@ do
         pcall(function() LogParagraph:SetDesc(table.concat(getgenv().HubGameLogs, "\n")) end)
     end)
 
-    Tabs.Listener:AddButton({
+    Tabs.Executor:AddButton({
         Title = "Clear Logs",
         Callback = function()
             getgenv().HubGameLogs = {}
@@ -903,7 +908,7 @@ do
     })
 
     local LuaInput = ""
-    Tabs.Listener:AddInput("LuaConsole_Input", {
+    Tabs.Executor:AddInput("LuaConsole_Input", {
         Title = "Lua Executor",
         Default = "",
         Placeholder = "print('Hello')",
@@ -914,7 +919,7 @@ do
         end
     })
 
-    Tabs.Listener:AddButton({
+    Tabs.Executor:AddButton({
         Title = "Execute Code",
         Callback = function()
             if LuaInput == "" then return end
