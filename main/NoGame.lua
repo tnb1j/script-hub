@@ -897,7 +897,8 @@ do
     local CodeBox = Instance.new("TextBox")
     CodeBox.Size = UDim2.new(1, 0, 1, -40)
     CodeBox.Position = UDim2.new(0, 0, 0, 0)
-    CodeBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    CodeBox.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    CodeBox.BackgroundTransparency = 0.4
     CodeBox.TextColor3 = Color3.fromRGB(230, 230, 230)
     CodeBox.Font = Enum.Font.Code
     CodeBox.TextSize = 14
@@ -910,31 +911,40 @@ do
     local uic = Instance.new("UICorner", CodeBox)
     uic.CornerRadius = UDim.new(0, 6)
     local stroke = Instance.new("UIStroke", CodeBox)
-    stroke.Color = Color3.fromRGB(60, 60, 65)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = 0.9
 
     local ExecBtn = Instance.new("TextButton")
     ExecBtn.Size = UDim2.new(0.48, 0, 0, 30)
     ExecBtn.Position = UDim2.new(0, 0, 1, -30)
-    ExecBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    ExecBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ExecBtn.BackgroundTransparency = 0.92
     ExecBtn.Text = "Execute"
     ExecBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ExecBtn.Font = Enum.Font.GothamBold
+    ExecBtn.Font = Enum.Font.GothamMedium
     ExecBtn.TextSize = 14
     ExecBtn.Parent = ExecutorFrame
     local uic2 = Instance.new("UICorner", ExecBtn)
     uic2.CornerRadius = UDim.new(0, 6)
+    local stroke2 = Instance.new("UIStroke", ExecBtn)
+    stroke2.Color = Color3.fromRGB(255, 255, 255)
+    stroke2.Transparency = 0.9
     
     local ClearBtn = Instance.new("TextButton")
     ClearBtn.Size = UDim2.new(0.48, 0, 0, 30)
     ClearBtn.Position = UDim2.new(0.52, 0, 1, -30)
-    ClearBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    ClearBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ClearBtn.BackgroundTransparency = 0.92
     ClearBtn.Text = "Clear"
     ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ClearBtn.Font = Enum.Font.GothamBold
+    ClearBtn.Font = Enum.Font.GothamMedium
     ClearBtn.TextSize = 14
     ClearBtn.Parent = ExecutorFrame
     local uic3 = Instance.new("UICorner", ClearBtn)
     uic3.CornerRadius = UDim.new(0, 6)
+    local stroke3 = Instance.new("UIStroke", ClearBtn)
+    stroke3.Color = Color3.fromRGB(255, 255, 255)
+    stroke3.Transparency = 0.9
     
     ExecBtn.MouseButton1Click:Connect(function()
         local code = CodeBox.Text
