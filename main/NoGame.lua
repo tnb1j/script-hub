@@ -478,7 +478,7 @@ do
         pcall(function()
             rootPart.Size = Vector3.new(2, 2, 1)
             rootPart.Transparency = 1
-            rootPart.CanCollide = false
+            rootPart.CanCollide = true
         end)
     end
 
@@ -708,9 +708,181 @@ do
     })
 
     -- =====================================
-    -- UI: LISTENER TAB
+    -- UI: LISTENER TAB (GokuThug1 Logic)
     -- =====================================
-    Tabs.Listener:AddSection("LogService Output")
+    getgenv().GokuListener = {
+        Events = {},
+        EventNames = {"None"},
+        ListenMarket = true,
+        ListenRemotes = false,
+        ListenBindables = false,
+        TargetOnlyMe = false,
+        AutoFire = false,
+        CrashMode = false,
+        CPS = 10,
+        ActiveLoop = nil
+    }
+
+    Tabs.Listener:AddSection("Listener Settings")
+    Tabs.Listener:AddToggle("ListenMarket_T", { Title = "Listen: Marketplace", Default = true }):OnChanged(function(v) getgenv().GokuListener.ListenMarket = v end)
+    Tabs.Listener:AddToggle("ListenRemotes_T", { Title = "Listen: Remotes", Default = false }):OnChanged(function(v) getgenv().GokuListener.ListenRemotes = v end)
+    Tabs.Listener:AddToggle("ListenBindables_T", { Title = "Listen: Bindables", Default = false }):OnChanged(function(v) getgenv().GokuListener.ListenBindables = v end)
+    Tabs.Listener:AddToggle("TargetOnlyMe_T", { Title = "Filter: Target Only Me", Default = false }):OnChanged(function(v) getgenv().GokuListener.TargetOnlyMe = v end)
+
+    Tabs.Listener:AddSection("Fire Settings")
+    Tabs.Listener:AddToggle("AutoFire_T", { Title = "Auto Fire (Loop Mode)", Default = false }):OnChanged(function(v) 
+        getgenv().GokuListener.AutoFire = v 
+        if not v then getgenv().GokuListener.ActiveLoop = nil end
+    end)
+    Tabs.Listener:AddToggle("CrashMode_T", { Title = "Crash Mode (Fast Burst)", Default = false }):OnChanged(function(v) getgenv().GokuListener.CrashMode = v end)
+    Tabs.Listener:AddSlider("FireCPS_S", { Title = "Fire CPS", Default = 10, Min = 1, Max = 1000, Rounding = 0, Callback = function(v) getgenv().GokuListener.CPS = v end })
+
+    Tabs.Listener:AddSection("Caught Events")
+    
+    local EventDropdown = Tabs.Listener:AddDropdown("CaughtEvents_DD", {
+        Title = "Select Event",
+        Values = getgenv().GokuListener.EventNames,
+        Multi = false,
+        Default = 1,
+    })
+
+    local function triggerEvent(ev)
+        pcall(function()
+            if ev.type == "Product" then game:GetService("MarketplaceService"):SignalPromptProductPurchaseFinished(Players.LocalPlayer.UserId, ev.id, true)
+            elseif ev.type == "Gamepass" then game:GetService("MarketplaceService"):SignalPromptGamePassPurchaseFinished(Players.LocalPlayer, ev.id, true)
+            elseif ev.type == "Purchase" then game:GetService("MarketplaceService"):SignalPromptPurchaseFinished(Players.LocalPlayer.UserId, ev.id, true)
+            elseif ev.type == "Network" then
+                if ev.method == "FireServer" then ev.instance:FireServer(unpack(ev.args))
+                elseif ev.method == "InvokeServer" then ev.instance:InvokeServer(unpack(ev.args))
+                elseif ev.method == "Fire" then ev.instance:Fire(unpack(ev.args))
+                elseif ev.method == "Invoke" then ev.instance:Invoke(unpack(ev.args))
+                end
+            end
+        end)
+    end
+
+    Tabs.Listener:AddButton({
+        Title = "Fire Selected Event",
+        Callback = function()
+            local sel = Options.CaughtEvents_DD.Value
+            local ev = getgenv().GokuListener.Events[sel]
+            if not ev then return end
+
+            if getgenv().GokuListener.CrashMode then
+                local ticks = 0
+                local conn
+                conn = RunService.Heartbeat:Connect(function()
+                    for _ = 1, 100 do triggerEvent(ev) end
+                    ticks = ticks + 1
+                    if ticks > 50 then conn:Disconnect() end
+                end)
+            elseif getgenv().GokuListener.AutoFire then
+                local loopId = tick()
+                getgenv().GokuListener.ActiveLoop = loopId
+                task.spawn(function()
+                    while getgenv().GokuListener.AutoFire and getgenv().GokuListener.ActiveLoop == loopId do
+                        triggerEvent(ev)
+                        task.wait(1 / getgenv().GokuListener.CPS)
+                    end
+                end)
+            else
+                triggerEvent(ev)
+            end
+        end
+    })
+
+    Tabs.Listener:AddButton({
+        Title = "Stop Auto Fire",
+        Callback = function() getgenv().GokuListener.ActiveLoop = nil end
+    })
+
+    Tabs.Listener:AddButton({
+        Title = "Clear Caught Events",
+        Callback = function()
+            getgenv().GokuListener.Events = {}
+            getgenv().GokuListener.EventNames = {"None"}
+            EventDropdown:SetValues(getgenv().GokuListener.EventNames)
+            EventDropdown:SetValue("None")
+        end
+    })
+
+    local function addEvent(id, name, evData)
+        if not getgenv().GokuListener.Events[id] then
+            getgenv().GokuListener.Events[id] = evData
+            if getgenv().GokuListener.EventNames[1] == "None" then table.remove(getgenv().GokuListener.EventNames, 1) end
+            table.insert(getgenv().GokuListener.EventNames, id)
+            EventDropdown:SetValues(getgenv().GokuListener.EventNames)
+            EventDropdown:SetValue(id)
+        else
+            getgenv().GokuListener.Events[id].count = (getgenv().GokuListener.Events[id].count or 1) + 1
+            if evData.args then getgenv().GokuListener.Events[id].args = evData.args end
+        end
+    end
+
+    -- Hook Marketplace
+    local MarketplaceService = game:GetService("MarketplaceService")
+    MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, id, isPurchased)
+        if getgenv().GokuListener.ListenMarket and userId == Players.LocalPlayer.UserId then 
+            addEvent("Product_"..id, "Product: "..id, {type = "Product", id = id, count = 1})
+        end
+    end)
+    MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, id, isPurchased)
+        if getgenv().GokuListener.ListenMarket and player == Players.LocalPlayer then 
+            addEvent("Gamepass_"..id, "Gamepass: "..id, {type = "Gamepass", id = id, count = 1})
+        end
+    end)
+    MarketplaceService.PromptPurchaseFinished:Connect(function(player, id, isPurchased)
+        if getgenv().GokuListener.ListenMarket and player == Players.LocalPlayer then 
+            addEvent("Purchase_"..id, "Purchase: "..id, {type = "Purchase", id = id, count = 1})
+        end
+    end)
+
+    -- Hook Network
+    local function involvesLocalPlayer(args)
+        if not getgenv().GokuListener.TargetOnlyMe then return true end
+        if #args == 0 then return false end
+        local lp = Players.LocalPlayer
+        local function check(val, depth)
+            if depth > 2 then return false end
+            if val == lp or val == lp.Name or val == lp.UserId then return true end
+            if lp.Character and val == lp.Character then return true end
+            if typeof(val) == "Instance" and lp.Character and val:IsDescendantOf(lp.Character) then return true end
+            if type(val) == "table" then
+                for _, v in pairs(val) do if check(v, depth + 1) then return true end end
+            end
+            return false
+        end
+        for _, arg in ipairs(args) do if check(arg, 1) then return true end end
+        return false
+    end
+
+    if hookmetamethod then
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            if not checkcaller() then
+                local method = getnamecallmethod()
+                local args = {...}
+                if getgenv().GokuListener.ListenRemotes and (method == "FireServer" or method == "InvokeServer") then
+                    local isValid = false; pcall(function() isValid = (self.ClassName == "RemoteEvent" or self.ClassName == "RemoteFunction") end)
+                    if isValid and involvesLocalPlayer(args) then
+                        local pathName = self.Name; pcall(function() pathName = self:GetFullName() end)
+                        local id = pathName .. " (" .. method .. ")"
+                        addEvent(id, id, {type = "Network", instance = self, method = method, args = args, count = 1})
+                    end
+                elseif getgenv().GokuListener.ListenBindables and (method == "Fire" or method == "Invoke") then
+                    local isValid = false; pcall(function() isValid = (self.ClassName == "BindableEvent" or self.ClassName == "BindableFunction") end)
+                    if isValid and involvesLocalPlayer(args) then
+                        local pathName = self.Name; pcall(function() pathName = self:GetFullName() end)
+                        local id = pathName .. " (" .. method .. ")"
+                        addEvent(id, id, {type = "Network", instance = self, method = method, args = args, count = 1})
+                    end
+                end
+            end
+            return oldNamecall(self, ...)
+        end)
+    end
+
+    Tabs.Listener:AddSection("Console / LogService Output")
 
     local LogParagraph = Tabs.Listener:AddParagraph({ Title = "Game Logs", Content = "Waiting for logs..." })
     getgenv().HubGameLogs = {}
@@ -730,44 +902,9 @@ do
         end
     })
 
-    Tabs.Listener:AddSection("Remote Spy")
-
-    local RemoteSpyToggle = Tabs.Listener:AddToggle("RemoteSpy_Toggle", { Title = "Remote Spy (Logs to F9)", Default = false })
-    local oldNamecall
-    if hookmetamethod then
-        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-            if Options.RemoteSpy_Toggle.Value then
-                local method = getnamecallmethod()
-                if method == "FireServer" or method == "InvokeServer" then
-                    print(string.format("[Remote Spy] %s -> %s", tostring(self), method))
-                end
-            end
-            return oldNamecall(self, ...)
-        end)
-    end
-
-    Tabs.Listener:AddSection("Marketplace Blocker")
-
-    local BlockPurchasesToggle = Tabs.Listener:AddToggle("BlockPurchases_Toggle", { Title = "Block Purchases", Default = false })
-    local mt = getrawmetatable and getrawmetatable(game:GetService("MarketplaceService"))
-    if mt then
-        local oldIndex = mt.__index
-        setreadonly(mt, false)
-        mt.__index = function(self, k, ...)
-            if Options.BlockPurchases_Toggle.Value and (k == "PromptProductPurchase" or k == "PromptPurchase" or k == "PromptGamePassPurchase") then
-                warn("[Purchase Blocked] Prevented prompt for: " .. tostring(k))
-                return function() end
-            end
-            return oldIndex(self, k, ...)
-        end
-        setreadonly(mt, true)
-    end
-
-    Tabs.Listener:AddSection("Console / Executor")
-
     local LuaInput = ""
     Tabs.Listener:AddInput("LuaConsole_Input", {
-        Title = "Lua Code",
+        Title = "Lua Executor",
         Default = "",
         Placeholder = "print('Hello')",
         Numeric = false,
