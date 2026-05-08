@@ -1352,7 +1352,114 @@ do
         end
     else
         warn("[gokuthug1's Hub] Failed to fetch game directory payload: " .. tostring(map_response))
+    end    -- =====================================
+    -- UI: CUSTOM MACRO KEYBINDS
+    -- =====================================
+    Tabs.Settings:AddSection("Custom Macro Keybinds")
+
+    local BindableActions = {
+        ["None"] = function() end,
+        ["Toggle Flight"] = function() if Options.Fly_Toggle then Options.Fly_Toggle:SetValue(not Options.Fly_Toggle.Value) end end,
+        ["Toggle Noclip"] = function() if Options.Noclip_Toggle then Options.Noclip_Toggle:SetValue(not Options.Noclip_Toggle.Value) end end,
+        ["Toggle God Mode"] = function() if Options.GodMode_Toggle then Options.GodMode_Toggle:SetValue(not Options.GodMode_Toggle.Value) end end,
+        ["Toggle Infinite Jump"] = function() if Options.InfJump_Toggle then Options.InfJump_Toggle:SetValue(not Options.InfJump_Toggle.Value) end end,
+        ["Toggle Anti-Void"] = function() if Options.AntiVoid_Toggle then Options.AntiVoid_Toggle:SetValue(not Options.AntiVoid_Toggle.Value) end end,
+        ["Toggle Enemy Hitboxes"] = function() if Options.EnemyExpander_Toggle then Options.EnemyExpander_Toggle:SetValue(not Options.EnemyExpander_Toggle.Value) end end,
+        ["Rejoin Server"] = function()
+            if #Players:GetPlayers() <= 1 then
+                game:GetService("TeleportService"):Teleport(game.PlaceId, Players.LocalPlayer)
+            else
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, Players.LocalPlayer)
+            end
+        end,
+        ["Clear Caught Events"] = function()
+            if getgenv().GokuListener then
+                getgenv().GokuListener.Events = {}
+                getgenv().GokuListener.EventNames = {"None"}
+                if Options.CaughtEvents_DD then
+                    Options.CaughtEvents_DD:SetValues({"None"})
+                    Options.CaughtEvents_DD:SetValue("None")
+                end
+            end
+        end
+    }
+
+    local actionNames = {}
+    for k, _ in pairs(BindableActions) do table.insert(actionNames, k) end
+    table.sort(actionNames)
+
+    local currentActionToBind = "None"
+    
+    local BindsParagraph = Tabs.Settings:AddParagraph({
+        Title = "Active Keybinds",
+        Content = "None"
+    })
+    
+    local CustomBinds = {}
+    
+    local function updateBindsText()
+        local str = ""
+        for key, action in pairs(CustomBinds) do
+            str = str .. "[" .. key .. "] -> " .. action .. "\n"
+        end
+        if str == "" then str = "None" end
+        BindsParagraph:SetDesc(str)
     end
+
+    Tabs.Settings:AddDropdown("Macro_Action_Select", {
+        Title = "Select Action to Bind",
+        Values = actionNames,
+        Multi = false,
+        Default = 1,
+        Callback = function(v)
+            currentActionToBind = v
+        end
+    })
+
+    local binding = false
+    local BindBtn = Tabs.Settings:AddButton({
+        Title = "Click to Bind Selected Action",
+        Callback = function()
+            if currentActionToBind == "None" then return end
+            if binding then return end
+            binding = true
+            
+            Fluent:Notify({ Title = "Keybind Mode", Content = "Press any key to bind to: " .. currentActionToBind, Duration = 3 })
+            
+            local conn
+            conn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    local key = input.KeyCode.Name
+                    if key ~= "Unknown" then
+                        CustomBinds[key] = currentActionToBind
+                        updateBindsText()
+                        Fluent:Notify({ Title = "Keybind Set", Content = "Bound [" .. key .. "] to " .. currentActionToBind, Duration = 2 })
+                    end
+                    binding = false
+                    conn:Disconnect()
+                end
+            end)
+        end
+    })
+
+    Tabs.Settings:AddButton({
+        Title = "Clear All Custom Binds",
+        Callback = function()
+            CustomBinds = {}
+            updateBindsText()
+            Fluent:Notify({ Title = "Cleared", Content = "All custom keybinds removed.", Duration = 2 })
+        end
+    })
+
+    game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            local action = CustomBinds[input.KeyCode.Name]
+            if action and BindableActions[action] then
+                pcall(BindableActions[action])
+            end
+        end
+    end)
 
     SaveManager:SetLibrary(Fluent)
     InterfaceManager:SetLibrary(Fluent)
