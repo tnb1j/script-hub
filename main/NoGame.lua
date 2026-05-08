@@ -233,6 +233,204 @@ do
             if getgenv().AFKConnection then getgenv().AFKConnection:Disconnect() end
         end
     end)
+
+    Tabs.Script:AddSection("Universal Hitbox Expander")
+    Tabs.Script:AddParagraph({
+        Title = "Hitbox Configuration",
+        Content = "Modify enemy and local hitboxes seamlessly.\nSizes are capped only by the engine-safe range up to 2048."
+    })
+
+    getgenv().HitboxSettings = getgenv().HitboxSettings or {
+        EnemyExpander = false,
+        TeamCheck = true,
+        EnemySize = 15,
+        EnemyTransparency = 0.5,
+        SelfExpander = false,
+        SelfSize = 2,
+        SelfTransparency = 1
+    }
+
+    local function getRootPart(character)
+        if not character then
+            return nil
+        end
+
+        return character:FindFirstChild("HumanoidRootPart")
+    end
+
+    local function safeHitboxSize(value)
+        return math.clamp(tonumber(value) or 2, 0.05, 2048)
+    end
+
+    local function resetCharacterHitbox(character)
+        local rootPart = getRootPart(character)
+        if not rootPart then
+            return
+        end
+
+        pcall(function()
+            rootPart.Size = Vector3.new(2, 2, 1)
+            rootPart.Transparency = 1
+            rootPart.CanCollide = false
+        end)
+    end
+
+    local function resetEnemyHitboxes()
+        for _, otherPlayer in ipairs(Players:GetPlayers()) do
+            if otherPlayer ~= player then
+                resetCharacterHitbox(otherPlayer.Character)
+            end
+        end
+    end
+
+    local function resetAllHitboxes()
+        resetEnemyHitboxes()
+        resetCharacterHitbox(player.Character)
+    end
+
+    if getgenv().HitboxConnection then
+        getgenv().HitboxConnection:Disconnect()
+        getgenv().HitboxConnection = nil
+    end
+    resetAllHitboxes()
+
+    local EnemyToggle = Tabs.Script:AddToggle("EnemyExpander_Toggle", {
+        Title = "Expand Enemy Hitboxes",
+        Default = getgenv().HitboxSettings.EnemyExpander
+    })
+
+    EnemyToggle:OnChanged(function()
+        getgenv().HitboxSettings.EnemyExpander = Options.EnemyExpander_Toggle.Value
+
+        if not getgenv().HitboxSettings.EnemyExpander then
+            resetEnemyHitboxes()
+        end
+    end)
+
+    local TeamCheckToggle = Tabs.Script:AddToggle("TeamCheck_Toggle", {
+        Title = "Team Check",
+        Default = getgenv().HitboxSettings.TeamCheck
+    })
+
+    TeamCheckToggle:OnChanged(function()
+        getgenv().HitboxSettings.TeamCheck = Options.TeamCheck_Toggle.Value
+
+        if getgenv().HitboxSettings.TeamCheck then
+            resetEnemyHitboxes()
+        end
+    end)
+
+    Tabs.Script:AddSlider("EnemySize_Slider", {
+        Title = "Enemy Hitbox Size",
+        Description = "Sets how large enemy hitboxes become. 0 uses the minimum safe size; 2048 is the maximum.",
+        Default = getgenv().HitboxSettings.EnemySize,
+        Min = 0,
+        Max = 2048,
+        Rounding = 1,
+        Callback = function(Value)
+            getgenv().HitboxSettings.EnemySize = safeHitboxSize(Value)
+        end
+    })
+
+    Tabs.Script:AddSlider("EnemyTrans_Slider", {
+        Title = "Enemy Transparency (%)",
+        Description = "0% is fully visible, 100% is invisible.",
+        Default = math.round((getgenv().HitboxSettings.EnemyTransparency or 0.5) * 100),
+        Min = 0,
+        Max = 100,
+        Rounding = 0,
+        Callback = function(Value)
+            getgenv().HitboxSettings.EnemyTransparency = math.clamp(Value / 100, 0, 1)
+        end
+    })
+
+    Tabs.Script:AddSection("Your Hitbox (Self)")
+
+    local SelfToggle = Tabs.Script:AddToggle("SelfExpander_Toggle", {
+        Title = "Modify Own Hitbox",
+        Default = getgenv().HitboxSettings.SelfExpander
+    })
+
+    SelfToggle:OnChanged(function()
+        getgenv().HitboxSettings.SelfExpander = Options.SelfExpander_Toggle.Value
+
+        if not getgenv().HitboxSettings.SelfExpander then
+            resetCharacterHitbox(player.Character)
+        end
+    end)
+
+    Tabs.Script:AddSlider("SelfSize_Slider", {
+        Title = "Own Hitbox Size",
+        Description = "Shrink yourself close to zero or expand up to the maximum safe size.",
+        Default = getgenv().HitboxSettings.SelfSize,
+        Min = 0,
+        Max = 2048,
+        Rounding = 1,
+        Callback = function(Value)
+            getgenv().HitboxSettings.SelfSize = safeHitboxSize(Value)
+        end
+    })
+
+    Tabs.Script:AddSlider("SelfTrans_Slider", {
+        Title = "Own Transparency (%)",
+        Description = "0% is fully visible, 100% is invisible.",
+        Default = math.round((getgenv().HitboxSettings.SelfTransparency or 1) * 100),
+        Min = 0,
+        Max = 100,
+        Rounding = 0,
+        Callback = function(Value)
+            getgenv().HitboxSettings.SelfTransparency = math.clamp(Value / 100, 0, 1)
+        end
+    })
+
+    Tabs.Script:AddButton({
+        Title = "Reset All Hitboxes",
+        Description = "Restore local and enemy root parts to their default values.",
+        Callback = function()
+            resetAllHitboxes()
+        end
+    })
+
+    getgenv().HitboxConnection = RunService.Stepped:Connect(function()
+        local settings = getgenv().HitboxSettings
+
+        if settings.EnemyExpander then
+            for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                if otherPlayer ~= player and otherPlayer.Character then
+                    local rootPart = getRootPart(otherPlayer.Character)
+                    if rootPart then
+                        local isTeammate = settings.TeamCheck
+                            and player.Team ~= nil
+                            and otherPlayer.Team ~= nil
+                            and otherPlayer.Team == player.Team
+
+                        if isTeammate then
+                            resetCharacterHitbox(otherPlayer.Character)
+                        else
+                            pcall(function()
+                                local size = safeHitboxSize(settings.EnemySize)
+                                rootPart.Size = Vector3.new(size, size, size)
+                                rootPart.Transparency = math.clamp(settings.EnemyTransparency or 0.5, 0, 1)
+                                rootPart.CanCollide = false
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+
+        if settings.SelfExpander and player.Character then
+            local rootPart = getRootPart(player.Character)
+            if rootPart then
+                pcall(function()
+                    local size = safeHitboxSize(settings.SelfSize)
+                    rootPart.Size = Vector3.new(size, size, size)
+                    rootPart.Transparency = math.clamp(settings.SelfTransparency or 1, 0, 1)
+                    rootPart.CanCollide = false
+                end)
+            end
+        end
+    end)
     
     Tabs.Script:AddSection("Integrated Administration Frameworks")
 
