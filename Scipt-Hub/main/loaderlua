@@ -1,0 +1,70 @@
+local function encodeURL(url)
+    url = string.gsub(url, , %%7C)
+    url = string.gsub(url, 🟢, %%F0%%9F%%9F%%A2)
+    url = string.gsub(url, 🟠, %%F0%%9F%%9F%%A0) 
+    url = string.gsub(url, 🔴, %%F0%%94%%B4)
+    return url
+end
+
+local Fluent = loadstring(gameHttpGet(httpsgithub.comdawid-scriptsFluentreleaseslatestdownloadmain.lua))()
+-- Updated targeting to your new repo
+local api_url = httpsapi.github.comrepostnb1jscript-hubcontentsScriptref=main
+local PlaceId = game.PlaceId
+
+local success, response = pcall(function()
+    return request({
+        Url = api_url,
+        Method = GET,
+        Headers = {
+            [Content-Type] = applicationjson
+        }
+    })
+end)
+
+if success and response.StatusCode == 200 then
+    local http = gameGetService(HttpService)
+    local data = httpJSONDecode(response.Body)
+
+    local found = false
+    for _, file in pairs(data) do
+        local fullName = file.name
+        local nameParts = string.split(fullName, )
+        
+        local mapName = nameParts[1]
+        local mapId = tonumber(nameParts[2])
+        local status = nameParts[3]
+        local download_url = file.download_url
+
+        if download_url and PlaceId == mapId then
+            print([gokuthug1's Hub] Loading game config  .. mapName)
+
+            FluentNotify({
+                Title = gokuthug1's Script Hub,
+                Content = Executing dynamic profile for  .. mapName,
+                Duration = 8
+            })
+
+            local encoded_url = encodeURL(download_url)
+            loadstring(gameHttpGet(encoded_url))()
+            found = true
+            break
+        end
+    end
+    
+    if not found then
+        print([gokuthug1's Hub] No dedicated script profile found for this Game ID.)
+
+        FluentNotify({
+            Title = gokuthug1's Script Hub,
+            Content = Universal profile applied successfully.,
+            Duration = 8
+        })
+
+        -- Fallback to the rebranded generic layout
+        loadstring(gameHttpGet(httpsraw.githubusercontent.comtnb1jscript-hubmainNoGame.lua))()
+    end
+else
+    print([gokuthug1's Hub] Critical Error fetching directory mapping  .. (response and response.StatusMessage or Unknown Network Error))
+    -- Force universal fallback load on network mapping exceptions
+    loadstring(gameHttpGet(httpsraw.githubusercontent.comtnb1jscript-hubmainNoGame.lua))()
+end
