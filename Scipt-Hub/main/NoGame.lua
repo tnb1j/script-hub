@@ -229,7 +229,7 @@ do
         Content = "🟢 Fully Functional: Complete architectural profile script adaptation.\n🟠 Partially Functional: Legacy build layout; features could run inconsistently.\n🔴 Non-Functional: Patched structural security layout limits exploitation."
     })
 
-    -- Dynamically requests content lists from your new repository matching structural parameters
+    -- Dynamically requests content lists from your new repository
     local api_url = "https://api.github.com/repos/tnb1j/script-hub/contents/Script?ref=main"
     local map_success, map_response = pcall(function()
         return request({ Url = api_url, Method = "GET", Headers = { ["Content-Type"] = "application/json" } })
@@ -241,12 +241,14 @@ do
     
         for _, file in pairs(data) do
             local fullName = file.name
-            local mapName, mapId, status = fullName:match("^(.-)|(%d+)|(.+)$")
             
-            if mapName and mapId and status then
-                mapId = tonumber(mapId)
+            -- Reads the new hyphen structure: Timebomb-Duels-11379739543-🟢.lua
+            local mapName, mapIdStr, status = fullName:match("^(.-)%-(%d+)%-(.+)%.lua$")
+            
+            if mapName and mapIdStr and status then
+                local mapId = tonumber(mapIdStr)
                 Tabs.game:AddButton({
-                    Title = mapName .. " [" .. status:gsub("%.lua","") .. "]",
+                    Title = mapName .. " [" .. status .. "]",
                     Description = "Target Universe Routing Sequence ID: " .. tostring(mapId),
                     Callback = function()
                         Window:Dialog({
