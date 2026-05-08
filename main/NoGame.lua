@@ -86,6 +86,7 @@ if getgenv().GameName then
         Update = Window:AddTab({ Title = "Update", Icon = "upload" }),
         Gameworks = Window:AddTab({ Title = getgenv().GameName, Icon = "gamepad-2" }),
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
+        Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
         game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
     }
@@ -94,6 +95,7 @@ else
         Main = Window:AddTab({ Title = "Main", Icon = "info" }),
         Gameworks = Window:AddTab({ Title = "Unknown Game", Icon = "gamepad-2" }),
         Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
+        Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
         game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
     }
@@ -433,24 +435,30 @@ do
         end
     end)
     
-    Tabs.Script:AddSection("Integrated Administration Frameworks")
+    -- =====================================
+    -- UI: UNIVERSAL TAB
+    -- =====================================
+    Tabs.Universal:AddSection("Integrated Administration Frameworks")
 
-    Tabs.Script:AddButton({
+    Tabs.Universal:AddButton({
         Title = "Execute Infinite Yield",
+        Description = "Full-featured admin command framework.",
         Callback = function()
             loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
         end
     })
 
-    Tabs.Script:AddButton({
+    Tabs.Universal:AddButton({
         Title = "Execute Fates Admin",
+        Description = "Lightweight admin command script.",
         Callback = function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/fatesc/fates-admin/main/main.lua"))()
         end
     })
 
-    Tabs.Script:AddButton({
+    Tabs.Universal:AddButton({
         Title = "Execute Hydroxide",
+        Description = "Roblox remote spy and debugger.",
         Callback = function()
             local owner = "Upbolt"
             local branch = "revision"
@@ -462,17 +470,47 @@ do
         end
     })
 
-    Tabs.Script:AddButton({
+    Tabs.Universal:AddButton({
         Title = "Execute SimpleSpy Engine",
+        Description = "Remote event spy tool.",
         Callback = function()
             loadstring(game:HttpGet("https://github.com/exxtremestuffs/SimpleSpySource/raw/master/SimpleSpy.lua"))()
         end
     })
 
-    Tabs.Script:AddButton({
+    Tabs.Universal:AddButton({
         Title = "Execute Dark Dex V4",
+        Description = "Roblox explorer and debugger.",
         Callback = function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+        end
+    })
+
+    Tabs.Universal:AddSection("Client Utilities")
+
+    Tabs.Universal:AddButton({
+        Title = "Execute Hide Identity",
+        Description = "Masks your name, UserID, HWID, JobID and PlaceID client-side.",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Hide-identity.lua"))()
+        end
+    })
+
+    Tabs.Universal:AddButton({
+        Title = "Execute Private Server",
+        Description = "Generates and teleports you to a private server in the current game.",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Privateserver.lua"))()
+        end
+    })
+
+    Tabs.Universal:AddSection("Combat Utilities")
+
+    Tabs.Universal:AddButton({
+        Title = "Execute AimBot + ESP v4.7",
+        Description = "Universal aimbot and ESP with FOV, silent aim, hitbox expander, and triggerbot.",
+        Callback = function()
+            loadstring(game:HttpGet("https://pastebin.com/raw/sAru4B6j"))()
         end
     })
 

@@ -1,4 +1,5 @@
---[[ Hide some client information or cheat bypass I don't know
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 getgenv().IdentityConfig = getgenv().IdentityConfig or {
     FakeName = "???",
@@ -9,12 +10,6 @@ getgenv().IdentityConfig = getgenv().IdentityConfig or {
     FakePlaceId = 106656461757128,
     FakeGameName = "???",
 }
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Hide-identity.lua"))()
-]]
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
 getgenv().IdentityHider = getgenv().IdentityHider or {}
 local savedData = getgenv().IdentityHider
@@ -71,17 +66,17 @@ end
 
 local function applyPlayerChanges()
     local localPlayer = Players.LocalPlayer
-    
+
     if localPlayer.Name == savedData.originalName and not isLocationChanged(localPlayer, "Name") then
         localPlayer.Name = getgenv().IdentityConfig.FakeName
         markLocationChanged(localPlayer, "Name")
     end
-    
+
     if localPlayer.DisplayName == savedData.originalDisplayName and not isLocationChanged(localPlayer, "DisplayName") then
         localPlayer.DisplayName = getgenv().IdentityConfig.FakeName
         markLocationChanged(localPlayer, "DisplayName")
     end
-    
+
     if localPlayer.UserId == savedData.originalUserId and not isLocationChanged(localPlayer, "UserId") then
         pcall(function()
             localPlayer.UserId = getgenv().IdentityConfig.FakeUserId
@@ -96,7 +91,7 @@ local function updateWorkspaceNames(object)
             child.Name = getgenv().IdentityConfig.FakeName
             markLocationChanged(child, "Name")
         end
-        
+
         if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
             if child.Text == savedData.originalName and not isLocationChanged(child, "Text") then
                 child.Text = getgenv().IdentityConfig.FakeName
@@ -121,7 +116,7 @@ local function updateCoreGui()
     local success, coreGui = pcall(function()
         return game:GetService("CoreGui")
     end)
-    
+
     if success and coreGui then
         for _, gui in pairs(coreGui:GetChildren()) do
             updateWorkspaceNames(gui)
@@ -141,20 +136,20 @@ local function setupMonitoring()
         task.wait(0.1)
         updateWorkspaceNames(child)
     end)
-    
+
     local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
     playerGui.ChildAdded:Connect(function(child)
         task.wait(0.1)
         updateWorkspaceNames(child)
     end)
-    
+
     pcall(function()
         local coreGui = game:GetService("CoreGui")
         coreGui.ChildAdded:Connect(function(child)
             task.wait(0.1)
             updateWorkspaceNames(child)
         end)
-        
+
         for _, gui in pairs(coreGui:GetChildren()) do
             gui.ChildAdded:Connect(function(newChild)
                 task.wait(0.1)
@@ -162,7 +157,7 @@ local function setupMonitoring()
             end)
         end
     end)
-    
+
     Players.LocalPlayer.Changed:Connect(function(property)
         if property == "Name" or property == "DisplayName" or property == "UserId" then
             task.wait(0.1)
@@ -175,20 +170,10 @@ local function startContinuousLoop()
     task.spawn(function()
         while true do
             task.wait(2)
-            
             applyPlayerChanges()
-            
-            pcall(function()
-                updateWorkspaceNames(workspace)
-            end)
-            
-            pcall(function()
-                updatePlayerGui()
-            end)
-            
-            pcall(function()
-                updateCoreGui()
-            end)
+            pcall(function() updateWorkspaceNames(workspace) end)
+            pcall(function() updatePlayerGui() end)
+            pcall(function() updateCoreGui() end)
         end
     end)
 end

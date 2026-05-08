@@ -1,11 +1,5 @@
---[[
-loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Privateserver.lua"))()
-
-
- Script not made by me, My process has been made easy.
- 
- By: HeardKometa ( unsure )
-]]
+-- Script not made by me. My process has been made easy.
+-- By: HeardKometa (unsure)
 
 getgenv().CONFIG = getgenv().CONFIG or {
     placeId = nil,
@@ -86,7 +80,7 @@ end
 local function showError(errorMessage)
     ErrorText.Text = errorMessage
     ErrorText.Visible = true
-    
+
     task.wait(3)
     if Loading then
         Loading:Destroy()
@@ -136,7 +130,7 @@ do
         local a, b, c, d = 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476
         local messageLen = #message
         local paddedMessage = message .. "\128"
-        
+
         while #paddedMessage % 64 ~= 56 do
             paddedMessage = paddedMessage .. "\0"
         end
@@ -246,7 +240,7 @@ local function GenerateReservedServerCode(placeId)
     end
 
     uuid[7] = bit32.bor(bit32.band(uuid[7], 0x0F), 0x40)
-    uuid[9] = bit32.bor(bit32.band(uuid[9], 0x3F), 0x80) 
+    uuid[9] = bit32.bor(bit32.band(uuid[9], 0x3F), 0x80)
 
     local firstBytes = ""
     for i = 1, 16 do
@@ -271,7 +265,7 @@ local function GenerateReservedServerCode(placeId)
 
     local accessCodeBytes = signature .. content
     local accessCode = base64.encode(accessCodeBytes)
-    
+
     accessCode = accessCode:gsub("+", "-"):gsub("/", "_")
 
     local padding = 0
@@ -289,7 +283,7 @@ local function TeleportToPrivateServer(placeId, accessCode)
     local success, err = pcall(function()
         game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(placeId, "", accessCode)
     end)
-    
+
     if not success then
         return false, err
     end
@@ -298,41 +292,37 @@ end
 
 local function main()
     local rotationTween = startLoadingAnimation()
-    
+
     local success, result = pcall(function()
         local currentPlaceId = game.PlaceId
-        
+
         if not currentPlaceId or currentPlaceId <= 0 then
             error("Cannot get valid Place ID")
         end
 
-        if getgenv().CONFIG.placeId and getgenv().CONFIG.accessCode and 
+        if getgenv().CONFIG.placeId and getgenv().CONFIG.accessCode and
            getgenv().CONFIG.placeId == currentPlaceId then
-            
-            
+
             local teleportSuccess, teleportError = TeleportToPrivateServer(getgenv().CONFIG.placeId, getgenv().CONFIG.accessCode)
-            
+
             if teleportSuccess then
                 return true
-            else
             end
         end
 
-
         local accessCode, gameCode = GenerateReservedServerCode(currentPlaceId)
-        
+
         local teleportSuccess, teleportError = TeleportToPrivateServer(currentPlaceId, accessCode)
-        
+
         if teleportSuccess then
             getgenv().CONFIG.placeId = currentPlaceId
             getgenv().CONFIG.accessCode = accessCode
-            
             return true
         else
             return false
         end
     end)
-    
+
     if not success then
         if rotationTween then
             rotationTween:Cancel()
