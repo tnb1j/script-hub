@@ -1,0 +1,1679 @@
+getgenv().Tabs = nil
+getgenv().Options = nil
+getgenv().Window = nil
+getgenv().Toggle = nil
+getgenv().Value = nil
+
+getgenv().GameName = "Timebomb Duels!"
+
+if getgenv().ScriptGe then
+    getgenv().ScriptGe = nil
+end
+
+if getgenv().update then
+    getgenv().update = nil
+end
+
+getgenv().update = function()
+    local text = [[
+1.0.5 | 2025/9/5
+  * added Evasion of a bomb New Mode > Go to Up + Spin
+
+1.0.4 | 2025/8/20
+  * Improve Auto Join
+  * Improve Player Evasion
+
+1.0.3 | 2025/8/19
+  * Fix all Script
+  + add Auto Lava Close
+  + Disable Ice
+  * Internal improvements script
+
+1.0.0 | 2025/8/17
+  + add Script Timebomb Duels!
+    ]]
+    return text
+end
+
+getgenv().ScriptGe = function()
+
+getgenv().EnemyDetection = false
+getgenv().AFKMode = false
+getgenv().SmartEvasion = false
+getgenv().AutoJoin = false
+getgenv().JoinMode = "infection"
+getgenv().TargetPlayer = "all"
+
+local joinAttempts = {} 
+local lastJoinPosition = nil  
+local maxJoinAttempts = 5 
+local joinCooldown = {} 
+
+local lastPlayerCount = 0
+local playerUpdateConnection = nil
+local localPlayer = game.Players.LocalPlayer
+
+local dropdownUpdateEnabled = false
+
+local originalPosition = nil
+local isUsingBomb = false
+local lastEnemyPosition = nil
+local enemyVelocity = Vector3.new(0, 0, 0)
+local bombLoop = nil
+
+local enemyDetectionCache = {}
+local cacheTimeout = 0.5
+
+function isInGame()
+    local playerGui = localPlayer:FindFirstChild("PlayerGui")
+    if playerGui and playerGui:FindFirstChild("TBDUI") and playerGui.TBDUI:FindFirstChild("Main") and playerGui.TBDUI.Main:FindFirstChild("Scorebar") then
+        return playerGui.TBDUI.Main.Scorebar.Visible
+    end
+    return false
+end
+
+function detectEnemyPlayers()
+    local currentTime = tick()
+    if enemyDetectionCache.data and (currentTime - enemyDetectionCache.time) < cacheTimeout then
+        return enemyDetectionCache.data.enemies, enemyDetectionCache.data.arena
+    end
+
+    local enemyPlayers = {}
+    local localPlayerTeam = nil
+    local currentArenaForLocalPlayer = nil 
+    
+    if workspace.Arenas then
+        for arenaName, arena in pairs(workspace.Arenas:GetChildren()) do
+            if arena:FindFirstChild("Slots") then
+                if arena.Slots:FindFirstChild("Left") then
+                    for i = 1, 4 do
+                        local slot = arena.Slots.Left:FindFirstChild(tostring(i))
+                        if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                            local player = slot.Data.Player.Value
+                            if player == localPlayer then
+                                localPlayerTeam = "Left"
+                                currentArenaForLocalPlayer = arena 
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if not currentArenaForLocalPlayer and arena.Slots:FindFirstChild("Right") then
+                    for i = 1, 4 do
+                        local slot = arena.Slots.Right:FindFirstChild(tostring(i))
+                        if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                            local player = slot.Data.Player.Value
+                            if player == localPlayer then
+                                localPlayerTeam = "Right"
+                                currentArenaForLocalPlayer = arena
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if localPlayerTeam and currentArenaForLocalPlayer then 
+                    local enemyTeam = (localPlayerTeam == "Left") and "Right" or "Left"
+                    
+                    if currentArenaForLocalPlayer.Slots:FindFirstChild(enemyTeam) then
+                        for i = 1, 4 do
+                            local slot = currentArenaForLocalPlayer.Slots[enemyTeam]:FindFirstChild(tostring(i))
+                            if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                                local enemyPlayer = slot.Data.Player.Value
+                                if enemyPlayer and enemyPlayer ~= localPlayer then
+                                    table.insert(enemyPlayers, enemyPlayer)
+                                end
+                            end
+                        end
+                    end
+                    break 
+                end
+            end
+        end
+    end
+    
+    enemyDetectionCache = {
+        data = {enemies = enemyPlayers, arena = currentArenaForLocalPlayer},
+        time = currentTime
+    }
+    
+    return enemyPlayers, currentArenaForLocalPlayer 
+end
+
+function isPlayerOnArenaFloor(player, arena)
+    if not player or not arena then
+        return false
+    end
+    
+    if arena:FindFirstChild("Slots") then
+        for _, side in pairs({"Left", "Right"}) do
+            if arena.Slots:FindFirstChild(side) then
+                for i = 1, 4 do
+                    local slot = arena.Slots[side]:FindFirstChild(tostring(i))
+                    if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                        local slotPlayer = slot.Data.Player.Value
+                        
+                        if slotPlayer == player then
+                            if slot:FindFirstChild("Pad") then
+                                local pad = slot.Pad
+                                local color = pad.Color
+                                
+                                if math.abs(color.R - 255/255) < 0.01 and 
+                                   math.abs(color.G - 89/255) < 0.01 and 
+                                   math.abs(color.B - 89/255) < 0.01 then
+                                    return false 
+                                else
+                                    return true 
+                                end
+                            end
+                            
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+function findBombTool()
+    local localCharacter = localPlayer.Character
+    if localCharacter then
+        local bombTool = localCharacter:FindFirstChild("Bomb")
+        if bombTool then
+            return bombTool, localCharacter
+        end
+        
+        if localCharacter:FindFirstChild("Humanoid") then
+            for _, tool in pairs(localCharacter:GetChildren()) do
+                if tool:IsA("Tool") and tool.Name == "Bomb" then
+                    return tool, localCharacter
+                end
+            end
+        end
+    end
+    
+    if workspace.Characters then
+        local specificCharacter = workspace.Characters:FindFirstChild(localPlayer.Name)
+        if specificCharacter then
+            local bombTool = specificCharacter:FindFirstChild("Bomb")
+            if bombTool then
+                return bombTool, specificCharacter
+            end
+        end
+    end
+    
+    return nil, nil
+end
+
+function isPlayerAlive(player)
+    if player and player.Character and player.Character:FindFirstChild("Humanoid") then
+        local humanoid = player.Character.Humanoid
+        if humanoid.Health > 0 then
+            return true
+        end
+    end
+    return false
+end
+
+function teleportToWorldSpawn()
+    local character = localPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") and workspace:FindFirstChild("WorldSpawn") then
+        local humanoidRootPart = character.HumanoidRootPart
+        local worldSpawn = workspace.WorldSpawn
+        local distance = (humanoidRootPart.Position - worldSpawn.Position).Magnitude
+        
+        if distance > 10 then
+            humanoidRootPart.CFrame = worldSpawn.CFrame
+        end
+    end
+end
+
+function getAllPlayerNames()
+    local players = {"all"}
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= localPlayer then
+            table.insert(players, player.Name)
+        end
+    end
+    return players
+end
+
+function updatePlayerDropdown()
+    if not dropdownUpdateEnabled then return end
+    
+    local currentPlayerCount = #game.Players:GetPlayers()
+    if currentPlayerCount ~= lastPlayerCount then
+        local updatedPlayers = getAllPlayerNames()
+        TargetPlayerDropdown:SetValues(updatedPlayers)
+        lastPlayerCount = currentPlayerCount
+    end
+end
+
+function enableDropdownUpdates()
+    dropdownUpdateEnabled = true
+end
+
+function disableDropdownUpdates()
+    dropdownUpdateEnabled = false
+end
+
+-- =====================================
+-- Auto Join
+-- =====================================
+
+function isPlayerInArena()
+    if workspace.Arenas then
+        for _, arena in pairs(workspace.Arenas:GetChildren()) do
+            if arena:FindFirstChild("Slots") then
+                for _, side in pairs({"Left", "Right"}) do
+                    if arena.Slots:FindFirstChild(side) then
+                        for i = 1, 4 do
+                            local slot = arena.Slots[side]:FindFirstChild(tostring(i))
+                            if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                                if slot.Data.Player.Value == localPlayer then
+                                    return true, arena, side, i
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+function isPlayerInsideHull(arena, side, slotNum)
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local slot = arena.Slots[side]:FindFirstChild(tostring(slotNum))
+    if not slot or not slot:FindFirstChild("Hull") then
+        return false
+    end
+    
+    local hull = slot.Hull
+    local playerPosition = character.HumanoidRootPart.Position
+    local hullPosition = hull.Position
+    local hullSize = hull.Size
+    
+    local distance = (playerPosition - hullPosition).Magnitude
+    local maxDistance = math.max(hullSize.X, hullSize.Y, hullSize.Z) / 2 + 2
+    
+    return distance <= maxDistance
+end
+
+function checkPlayerArenaStatus()
+    if workspace.Arenas then
+        for _, arena in pairs(workspace.Arenas:GetChildren()) do
+            if arena:FindFirstChild("Slots") then
+                for _, side in pairs({"Left", "Right"}) do
+                    if arena.Slots:FindFirstChild(side) then
+                        for i = 1, 4 do
+                            local slot = arena.Slots[side]:FindFirstChild(tostring(i))
+                            if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                                if slot.Data.Player.Value == localPlayer then
+                                    local isInside = isPlayerInsideHull(arena, side, i)
+                                    return true, arena, side, i, isInside
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false, nil, nil, nil, false
+end
+
+function joinArenaSlot(arena, targetSide, targetSlot)
+    if not arena.Slots[targetSide]:FindFirstChild(tostring(targetSlot)) or 
+       not arena.Slots[targetSide][tostring(targetSlot)]:FindFirstChild("Hull") then
+        return false
+    end
+    
+    local arenaKey = tostring(arena) .. "_" .. targetSide .. "_" .. targetSlot
+    local currentTime = tick()
+    
+    if joinCooldown[arenaKey] and (currentTime - joinCooldown[arenaKey]) < 2 then
+        return false
+    end
+    
+    local currentPosition = arena.Slots[targetSide][tostring(targetSlot)].Hull.Position
+    if lastJoinPosition and (lastJoinPosition - currentPosition).Magnitude > 10 then
+        joinAttempts = {}
+    end
+    lastJoinPosition = currentPosition
+    
+    if not joinAttempts[arenaKey] then
+        joinAttempts[arenaKey] = 0
+    end
+    
+    if joinAttempts[arenaKey] >= maxJoinAttempts then
+        teleportToWorldSpawn()
+        joinAttempts[arenaKey] = 0 
+        joinCooldown[arenaKey] = currentTime
+        return false
+    end
+    
+    local hull = arena.Slots[targetSide][tostring(targetSlot)].Hull
+    local character = localPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        joinAttempts[arenaKey] = joinAttempts[arenaKey] + 1
+        
+        character.HumanoidRootPart.CFrame = hull.CFrame * CFrame.new(0, -5, 0)
+        
+        wait(0.3)
+        
+        if isPlayerInsideHull(arena, targetSide, targetSlot) then
+            joinAttempts[arenaKey] = 0 
+            return true
+        else
+            return false
+        end
+    end
+    return false
+end
+
+function isSlotInGame(arena, side, slotNum)
+    local slot = arena.Slots[side]:FindFirstChild(tostring(slotNum))
+    if slot and slot:FindFirstChild("Pad") then
+        local pad = slot.Pad
+        local color = pad.Color
+        if math.abs(color.R - 87/255) < 0.01 and 
+           math.abs(color.G - 181/255) < 0.01 and 
+           math.abs(color.B - 57/255) < 0.01 then
+            return true
+        end
+    end
+    return false
+end
+
+function isAnyPlayerInGameInArena(arena)
+    if not arena or not arena:FindFirstChild("Slots") then
+        return false
+    end
+    
+    for _, side in pairs({"Left", "Right"}) do
+        if arena.Slots:FindFirstChild(side) then
+            for i = 1, 4 do
+                if isSlotInGame(arena, side, i) then
+                    return true
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+function autoFixPosition(arena, side, slotNum)
+    teleportToWorldSpawn()
+    wait(0.5) 
+    return joinArenaSlot(arena, side, slotNum)
+end
+
+function isReadyPromptVisible()
+    local playerGui = localPlayer:FindFirstChild("PlayerGui")
+    if playerGui and playerGui:FindFirstChild("TBDUI") and playerGui.TBDUI:FindFirstChild("Main") 
+    and playerGui.TBDUI.Main:FindFirstChild("Prompts") and playerGui.TBDUI.Main.Prompts:FindFirstChild("Ready") then
+        return playerGui.TBDUI.Main.Prompts.Ready.Visible, playerGui.TBDUI.Main.Prompts.Ready
+    end
+    return false, nil
+end
+
+function fireReadyRemote()
+    local remoteStorage = game:GetService("ReplicatedStorage")
+    if remoteStorage:FindFirstChild("Remotes") and remoteStorage.Remotes:FindFirstChild("Arena") 
+    and remoteStorage.Remotes.Arena:FindFirstChild("Ready") then
+        remoteStorage.Remotes.Arena.Ready:FireServer(true)
+    end
+end
+
+function findTargetPlayer(targetName)
+    if targetName == "all" then
+        return nil
+    end
+    
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player.Name == targetName and player ~= localPlayer then
+            return player
+        end
+    end
+    return nil
+end
+
+function findFirstAvailableSlot(arena, side, excludeSlot)
+    if not arena or not arena.Slots or not arena.Slots:FindFirstChild(side) then
+        return nil
+    end
+    
+    for i = 1, 4 do
+        if i ~= excludeSlot then
+            local slot = arena.Slots[side]:FindFirstChild(tostring(i))
+            if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                if slot.Data.Player.Value == nil and not isSlotInGame(arena, side, i) then
+                    return i
+                end
+            end
+        end
+    end
+    
+    return nil
+end
+
+function findPlayerInArenas(targetPlayer)
+    if workspace.Arenas then
+        local availablePlayers = {}
+        
+        for _, arena in pairs(workspace.Arenas:GetChildren()) do
+            if arena:FindFirstChild("Slots") then
+                if isAnyPlayerInGameInArena(arena) then
+                    continue
+                end
+                
+                for _, side in pairs({"Left", "Right"}) do
+                    if arena.Slots:FindFirstChild(side) then
+                        for i = 1, 4 do
+                            local slot = arena.Slots[side]:FindFirstChild(tostring(i))
+                            if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                                local player = slot.Data.Player.Value
+                                if player and player ~= localPlayer and player.Parent and not isSlotInGame(arena, side, i) then
+                                    local hasAvailableSlot = false
+                                    
+                                    if getgenv().JoinMode == "infection" then
+                                        local oppositeSide = (side == "Left") and "Right" or "Left"
+                                        if findFirstAvailableSlot(arena, oppositeSide, nil) then
+                                            hasAvailableSlot = true
+                                        end
+                                    elseif getgenv().JoinMode == "team" then
+                                        if findFirstAvailableSlot(arena, side, i) then
+                                            hasAvailableSlot = true
+                                        end
+                                    end
+                                    
+                                    if hasAvailableSlot then
+                                        if targetPlayer == nil then
+                                            table.insert(availablePlayers, {
+                                                arena = arena,
+                                                side = side,
+                                                slot = i,
+                                                player = player
+                                            })
+                                        elseif player == targetPlayer then
+                                            return arena, side, i, player
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        if targetPlayer == nil and #availablePlayers > 0 then
+            local selected = availablePlayers[1]
+            return selected.arena, selected.side, selected.slot, selected.player
+        end
+    end
+    return nil
+end
+
+function findBestSlot(arena, foundSide, foundSlot, foundPlayer)
+    if isAnyPlayerInGameInArena(arena) then
+        return nil, nil
+    end
+    
+    local targetSide = foundSide
+    local targetSlot = foundSlot
+    
+    if getgenv().JoinMode == "infection" then
+        targetSide = (foundSide == "Left") and "Right" or "Left"
+        targetSlot = foundSlot
+    elseif getgenv().JoinMode == "team" then
+        targetSide = foundSide
+        targetSlot = nil
+        
+        for i = 1, 4 do
+            if i ~= foundSlot then
+                local slot = arena.Slots[targetSide]:FindFirstChild(tostring(i))
+                if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                    if slot.Data.Player.Value == nil and not isSlotInGame(arena, targetSide, i) then
+                        targetSlot = i
+                        break
+                    end
+                end
+            end
+        end
+        
+        if targetSlot == nil then
+            return nil, nil
+        end
+    end
+    
+    return targetSide, targetSlot
+end
+
+-- =====================================
+-- Smart Evasion
+-- =====================================
+
+function hasEnemyBomb(enemy)
+    if enemy.Character then
+        local bombTool = enemy.Character:FindFirstChild("Bomb")
+        if bombTool then
+            return true
+        end
+        
+        for _, tool in pairs(enemy.Character:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == "Bomb" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function getEnemiesWithBombs(enemies)
+    local enemiesWithBombs = {}
+    for _, enemy in pairs(enemies) do
+        if hasEnemyBomb(enemy) then
+            table.insert(enemiesWithBombs, enemy)
+        end
+    end
+    return enemiesWithBombs
+end
+
+function checkForWalls(position, direction, maxDistance)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {localPlayer.Character}
+    
+    local raycast = workspace:Raycast(position, direction * maxDistance, raycastParams)
+    if raycast then
+        return math.max(1, raycast.Distance - 2) 
+    end
+    
+    return math.max(1, maxDistance - 2) 
+end
+
+local function isPositionInArena(pos, arena)
+    if arena and arena:IsA("Part") then
+        local bounds = arena.CFrame:pointToObjectSpace(pos)
+        local halfSize = arena.Size / 2
+        return math.abs(bounds.X) <= halfSize.X and math.abs(bounds.Y) <= halfSize.Y and math.abs(bounds.Z) <= halfSize.Z
+    end
+    return true 
+end
+
+local function checkPathClear(startPos, endPos)
+    local direction = (endPos - startPos)
+    local distance = direction.Magnitude
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {localPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    local result = workspace:Raycast(startPos, direction, raycastParams)
+    
+    if result then
+        return false, result.Position
+    else
+        return true, nil
+    end
+end
+
+function findUltimateEscapePosition(currentPosition, primaryEnemy, allEnemies, arena)
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        return currentPosition
+    end
+
+    local primaryEnemyPos = primaryEnemy.Character.HumanoidRootPart.Position
+    local primaryDistance = (currentPosition - primaryEnemyPos).Magnitude
+
+    if primaryDistance < 8 then
+        local emergencyDirection = (currentPosition - primaryEnemyPos).Unit
+
+        for testDist = 15, 5, -2 do
+            local emergencyPos = currentPosition + (emergencyDirection * testDist)
+            emergencyPos = Vector3.new(emergencyPos.X, currentPosition.Y, emergencyPos.Z)
+
+            local pathClear, actualPos = checkPathClear(currentPosition, emergencyPos)
+
+            if pathClear and isPositionInArena(emergencyPos, arena) then
+                return emergencyPos
+            elseif actualPos then
+                local safePos = currentPosition + (emergencyDirection * ((actualPos - currentPosition).Magnitude - 1))
+                safePos = Vector3.new(safePos.X, currentPosition.Y, safePos.Z)
+                if isPositionInArena(safePos, arena) then
+                    return safePos
+                end
+            end
+        end
+    end
+
+    local bestPosition = currentPosition
+    local maxSafetyScore = 0
+
+    local directions = {}
+    for angle = 0, 315, 30 do
+        local rad = math.rad(angle)
+        table.insert(directions, Vector3.new(math.cos(rad), 0, math.sin(rad)))
+    end
+
+    for _, direction in pairs(directions) do
+        for testDistance = 6, 25, 3 do
+            local testPosition = currentPosition + (direction * testDistance)
+            testPosition = Vector3.new(testPosition.X, currentPosition.Y, testPosition.Z)
+
+            local pathClear, blockedAt = checkPathClear(currentPosition, testPosition)
+
+            if not pathClear then
+                if blockedAt then
+                    local safeDistance = (blockedAt - currentPosition).Magnitude
+                    if safeDistance > 3 then
+                        testPosition = currentPosition + (direction * (safeDistance - 2))
+                        testPosition = Vector3.new(testPosition.X, currentPosition.Y, testPosition.Z)
+                        testDistance = safeDistance - 2
+                    else
+                        break
+                    end
+                else
+                    break
+                end
+            end
+
+            if not isPositionInArena(testPosition, arena) then
+                break
+            end
+
+            local safetyScore = 0
+            local minEnemyDistance = math.huge
+
+            for _, enemy in pairs(allEnemies) do
+                if enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
+                    local enemyPos = enemy.Character.HumanoidRootPart.Position
+                    local distanceToEnemy = (testPosition - enemyPos).Magnitude
+
+                    minEnemyDistance = math.min(minEnemyDistance, distanceToEnemy)
+
+                    if enemy == primaryEnemy then
+                        safetyScore = safetyScore + (distanceToEnemy * 3)
+                    else
+                        safetyScore = safetyScore + (distanceToEnemy * 1.5)
+                    end
+                end
+            end
+
+            if minEnemyDistance > 12 and minEnemyDistance < 30 then
+                safetyScore = safetyScore + 25
+            end
+
+            if pathClear then
+                safetyScore = safetyScore + 15
+            end
+
+            if testDistance > 8 and testDistance < 20 then
+                safetyScore = safetyScore + 10
+            end
+
+            if safetyScore > maxSafetyScore then
+                maxSafetyScore = safetyScore
+                bestPosition = testPosition
+            end
+        end
+    end
+
+    local finalCheck, blockedAt = checkPathClear(currentPosition, bestPosition)
+    if not finalCheck then
+        if blockedAt then
+            local fallbackDirection = (bestPosition - currentPosition).Unit
+            for dist = 5, 15, 2 do
+                local fallbackPos = currentPosition + (fallbackDirection * dist)
+                fallbackPos = Vector3.new(fallbackPos.X, currentPosition.Y, fallbackPos.Z)
+                local fallbackCheck, _ = checkPathClear(currentPosition, fallbackPos)
+                if fallbackCheck and isPositionInArena(fallbackPos, arena) then
+                    return fallbackPos
+                end
+            end
+        end
+        return currentPosition
+    end
+
+    return bestPosition
+end
+
+-- =====================================
+-- Enemy Detection Bomb
+-- =====================================
+
+function useBombOnEnemy(bombTool, character, targetEnemy)
+    if bombLoop or not bombTool or not character or not targetEnemy or not targetEnemy.Character then
+        return false
+    end
+
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local targetRootPart = targetEnemy.Character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart or not targetRootPart then
+        return false
+    end
+
+    if not isUsingBomb then
+        originalPosition = humanoidRootPart.CFrame
+        isUsingBomb = true
+    end
+
+    local lastTargetCFrame = targetRootPart.CFrame
+    local cframeChangeHistory = {}
+    local maxHistorySize = 3
+
+    local thresholds = {
+        {limit = 0.5,  offset = 0},   
+        {limit = 1.0,  offset = -7}, 
+        {limit = 1.5,  offset = -14},  
+        {limit = 2.0,  offset = -21}, 
+        {limit = 3.0,  offset = -27},   
+        {limit = 4.0,  offset = -36},
+        {limit = math.huge, offset = -43}
+    }
+
+    bombLoop = task.spawn(function()
+        local bombActivated = false
+        local attempts = 0
+        local maxAttempts = 100
+
+        while getgenv().EnemyDetection and character:FindFirstChild("Bomb") and attempts < maxAttempts do
+            attempts += 1
+            task.wait(0.001)
+            if not targetRootPart or not humanoidRootPart then break end
+
+            local currentCFrame = targetRootPart.CFrame
+            local cframeChange = (currentCFrame.Position - lastTargetCFrame.Position).Magnitude
+
+            table.insert(cframeChangeHistory, cframeChange)
+            if #cframeChangeHistory > maxHistorySize then
+                table.remove(cframeChangeHistory, 1)
+            end
+
+            local avgChange = 0
+            for _, change in ipairs(cframeChangeHistory) do
+                avgChange += change
+            end
+            avgChange = avgChange / #cframeChangeHistory
+
+            local baseOffset = 0
+            for _, t in ipairs(thresholds) do
+                if avgChange <= t.limit then
+                    baseOffset = t.offset
+                    break
+                end
+            end
+
+            local enemyVelocity = targetRootPart.Velocity
+            local predictionTime = 0.05
+            local predictedPosition = targetRootPart.Position + (enemyVelocity * predictionTime)
+
+            local predictedCFrame = CFrame.new(predictedPosition, predictedPosition + targetRootPart.CFrame.LookVector)
+            local smartBehindPosition = predictedCFrame * CFrame.new(0, 0, baseOffset)
+
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+            raycastParams.FilterDescendantsInstances = {character, targetEnemy.Character}
+            local direction = (smartBehindPosition.Position - humanoidRootPart.Position)
+            local raycastResult = workspace:Raycast(humanoidRootPart.Position, direction.Unit * direction.Magnitude, raycastParams)
+
+            if raycastResult then
+                smartBehindPosition = CFrame.new(raycastResult.Position) * CFrame.new(0,0,-1)
+            end
+
+            humanoidRootPart.CFrame = smartBehindPosition
+
+            lastTargetCFrame = currentCFrame
+
+            if not bombActivated then
+                bombActivated = true
+                task.wait(0.02)
+            end
+        end
+
+        bombLoop = nil
+        isUsingBomb = false
+        if originalPosition and humanoidRootPart then
+            humanoidRootPart.CFrame = originalPosition
+        end
+        originalPosition = nil
+    end)
+
+    return true
+end
+
+Tabs.Gameworks:AddParagraph({
+    Title = "WARNING",
+    Content = "Custom script for Auto Farm Automation\nFFA not working"
+})
+
+Tabs.Gameworks:AddSection("Auto Farm")
+
+-- =====================================
+--  Auto Enemy Detection Bomb
+-- =====================================
+local Toggle = Tabs.Gameworks:AddToggle("EnemyDetection_Toggle", {
+    Title = "Auto Enemy Detection Bomb", 
+    Default = false
+})
+
+Toggle:OnChanged(function()
+    getgenv().EnemyDetection = Options.EnemyDetection_Toggle.Value
+    if getgenv().EnemyDetection then
+        startEnemyDetectionLoop()
+        disableDropdownUpdates()
+    else
+        getgenv().EnemyDetection = false
+        enableDropdownUpdates() 
+        if isUsingBomb and originalPosition then
+            local character = localPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.CFrame = originalPosition
+                originalPosition = nil
+                isUsingBomb = false
+            end
+        end
+    end
+end)
+
+function startEnemyDetectionLoop()
+    spawn(function()
+        while getgenv().EnemyDetection do
+            wait(.0015)
+            
+            if not isInGame() then
+                wait(0.2)
+                continue
+            end
+            
+            local enemies, arenaOfLocalPlayer = detectEnemyPlayers()
+            
+            local validEnemies = {}
+            if arenaOfLocalPlayer then
+                for _, enemy in pairs(enemies) do
+                    if isPlayerAlive(enemy) and isPlayerOnArenaFloor(enemy, arenaOfLocalPlayer) then
+                        table.insert(validEnemies, enemy)
+                    end
+                end
+            end
+
+            if #validEnemies > 0 and not isUsingBomb then
+                local firstValidEnemy = validEnemies[1]
+                local bombTool, character = findBombTool()
+                
+                if bombTool and character then
+                    useBombOnEnemy(bombTool, character, firstValidEnemy)
+                end
+            elseif #validEnemies == 0 then
+                if isUsingBomb and originalPosition then
+                    local character = localPlayer.Character
+                    if character and character:FindFirstChild("HumanoidRootPart") then
+                        originalPosition = nil
+                        isUsingBomb = false
+                        if bombLoop then
+                            bombLoop = nil
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- =====================================
+-- Evasion of a bomb
+-- =====================================
+
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local evasionConnection 
+local spinConnection
+
+getgenv().EvasionMode = "Player Evasion"
+getgenv().SmartEvasion = false
+
+local EvasionModeDropdown = Tabs.Gameworks:AddDropdown("EvasionMode", {
+    Title = "Evasion of a bomb Mode",
+    Values = {"Player Evasion", "Go to Up + Spin"},
+    Multi = false,
+    Default = 1
+})
+
+EvasionModeDropdown:SetValue("Player Evasion")
+
+EvasionModeDropdown:OnChanged(function(Value)
+    getgenv().EvasionMode = Value
+end)
+
+local EvasionToggle = Tabs.Gameworks:AddToggle("SmartEvasion_Toggle", {
+    Title = "Evasion of a bomb", 
+    Default = false
+})
+
+EvasionToggle:OnChanged(function()
+    getgenv().SmartEvasion = Options.SmartEvasion_Toggle.Value
+    if getgenv().SmartEvasion then
+        startEvasionLoop()
+    else
+        if evasionConnection then evasionConnection:Disconnect() end
+        if spinConnection then spinConnection:Disconnect() end
+    end
+end)
+
+local function goToUpAndSpin()
+    spawn(function()
+        local targetCenter = Vector3.new(116.876785, 47, 34.0727844)
+        local circleRadius = 30
+        local circleSpeed = 0.1 
+        local currentAngle = 0
+        local isAtTarget = false
+        local emergencyMode = false
+        
+        local function touchingLavaCopy(character)
+            if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+            local hrp = character.HumanoidRootPart
+            local touchingParts = hrp:GetTouchingParts()
+            for _, part in ipairs(touchingParts) do
+                if part.Name:sub(1, 8) == "LavaCopy" then
+                    return true
+                end
+            end
+            return false
+        end
+
+        local function moveToTargetHeight()
+            local character = localPlayer.Character
+            if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+            
+            local root = character.HumanoidRootPart
+            local currentPos = root.Position
+            
+            if math.abs(currentPos.Y - targetCenter.Y) < 2 then
+                isAtTarget = true
+                return true
+            end
+            
+            root.CFrame = CFrame.new(targetCenter)
+            isAtTarget = true
+            
+            return true
+        end
+
+        local function performCircularMovement()
+            local character = localPlayer.Character
+            if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+            
+            local root = character.HumanoidRootPart
+            currentAngle = currentAngle + circleSpeed
+            
+            local x = targetCenter.X + math.cos(currentAngle) * circleRadius
+            local z = targetCenter.Z + math.sin(currentAngle) * circleRadius
+            local circlePos = Vector3.new(x, targetCenter.Y, z)
+            
+            root.CFrame = CFrame.new(circlePos)
+        end
+
+        while getgenv().SmartEvasion do
+            task.wait(0.01) 
+
+            if not isInGame() then
+                task.wait(0.2)
+                continue
+            end
+
+            local character = localPlayer.Character
+            if not character or not character:FindFirstChild("HumanoidRootPart") then
+                task.wait()
+                continue
+            end
+
+            local humanoidRootPart = character.HumanoidRootPart
+            local currentPosition = humanoidRootPart.Position
+
+            if touchingLavaCopy(character) then
+                emergencyMode = true
+                humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 60, 0)
+                task.wait(0.1)
+                continue
+            end
+
+            local enemies, currentArena = detectEnemyPlayers()
+            local enemiesWithBombs = getEnemiesWithBombs(enemies)
+
+            if #enemiesWithBombs > 0 and not isUsingBomb then
+                emergencyMode = false
+                
+                if not isAtTarget then
+                    moveToTargetHeight()
+                else
+                    performCircularMovement()
+                end
+            else
+                emergencyMode = false
+            end
+        end
+    end)
+end
+
+local function handlePlayerEvasion()
+spawn(function()
+    local lastEvasionTime = 0
+    local emergencyMode = false
+    local lastKnownEnemyPositions = {}
+    local lastSafePos = nil
+    local stuckCheckTime = tick()
+
+    local function touchingLavaCopy(character)
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+        local hrp = character.HumanoidRootPart
+        local touchingParts = hrp:GetTouchingParts()
+        for _, part in ipairs(touchingParts) do
+            if part.Name:sub(1, 8) == "LavaCopy" then
+                return true
+            end
+        end
+        return false
+    end
+
+    while getgenv().SmartEvasion do
+        task.wait()
+
+        if not isInGame() then
+            task.wait(0.2)
+            continue
+        end
+
+        local character = localPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then
+            task.wait()
+            continue
+        end
+
+        local humanoidRootPart = character.HumanoidRootPart
+        local currentPosition = humanoidRootPart.Position
+        local currentTime = tick()
+
+        if touchingLavaCopy(character) then
+            emergencyMode = true
+            humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 20, 0)
+            task.wait(0.2)
+            continue
+        end
+
+        local enemies, currentArena = detectEnemyPlayers()
+        local enemiesWithBombs = getEnemiesWithBombs(enemies)
+
+        if #enemiesWithBombs > 0 and not isUsingBomb then
+            local mostDangerousEnemy = nil
+            local closestDistance = math.huge
+            local highestThreat = 0
+
+            for _, enemy in pairs(enemiesWithBombs) do
+                if enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
+                    local enemyPos = enemy.Character.HumanoidRootPart.Position
+                    local distance = (currentPosition - enemyPos).Magnitude
+
+                    local enemyVelocity = Vector3.new(0, 0, 0)
+                    if lastKnownEnemyPositions[enemy.UserId] then
+                        local lastPos = lastKnownEnemyPositions[enemy.UserId].position
+                        local timeDiff = currentTime - lastKnownEnemyPositions[enemy.UserId].time
+                        if timeDiff > 0 then
+                            enemyVelocity = (enemyPos - lastPos) / timeDiff
+                        end
+                    end
+
+                    lastKnownEnemyPositions[enemy.UserId] = {
+                        position = enemyPos,
+                        time = currentTime
+                    }
+
+                    local speed = enemyVelocity.Magnitude
+                    local directionToMe = (currentPosition - enemyPos).Unit
+                    local enemyDirection = enemyVelocity.Unit
+
+                    local threatLevel = 0
+
+                    if distance < 60 then
+                        threatLevel = threatLevel + (60 - distance) * 2
+                    end
+
+                    if speed > 16 then 
+                        threatLevel = threatLevel + speed * 2
+                    end
+
+                    if speed > 5 then
+                        local dotProduct = enemyDirection:Dot(directionToMe)
+                        if dotProduct > 0.7 then
+                            threatLevel = threatLevel + 50
+                            emergencyMode = true
+                        elseif dotProduct > 0.3 then 
+                            threatLevel = threatLevel + 25
+                        end
+                    end
+
+                    if threatLevel > highestThreat or (threatLevel > 20 and distance < closestDistance) then
+                        mostDangerousEnemy = enemy
+                        highestThreat = threatLevel
+                        closestDistance = distance
+                    end
+                end
+            end
+
+            if mostDangerousEnemy and (highestThreat > 10 or emergencyMode) then
+                local safePosition = findUltimateEscapePosition(currentPosition, mostDangerousEnemy, enemiesWithBombs, currentArena)
+
+                if safePosition then
+                    local moveDistance = (safePosition - currentPosition).Magnitude
+                    if moveDistance > 3 then
+                        local steps = 8
+                        for i = 1, steps do
+                            if not getgenv().SmartEvasion then break end
+                            local alpha = i / steps
+                            local newPos = currentPosition:Lerp(safePosition, alpha)
+                            humanoidRootPart.CFrame = CFrame.new(newPos, newPos + (safePosition - currentPosition).Unit)
+                            task.wait(0.02)
+                        end
+                    end
+
+                    if lastSafePos then
+                        local moved = (currentPosition - lastSafePos).Magnitude
+                        if moved < 2 and (currentTime - stuckCheckTime) > 1 then
+                            humanoidRootPart.CFrame = CFrame.new(safePosition + Vector3.new(0, 2, 0))
+                            stuckCheckTime = currentTime
+                        end
+                    end
+                    lastSafePos = humanoidRootPart.Position
+                end
+            end
+        else
+            emergencyMode = false
+            lastKnownEnemyPositions = {}
+        end
+    end
+end)
+
+   
+end
+
+
+
+function startEvasionLoop()
+    if evasionConnection then evasionConnection:Disconnect() end
+    if spinConnection then spinConnection:Disconnect() end
+
+    if getgenv().EvasionMode == "Player Evasion" then
+        handlePlayerEvasion()
+    elseif getgenv().EvasionMode == "Go to Up + Spin" then
+        goToUpAndSpin()
+    end
+end
+
+Tabs.Gameworks:AddSection("Automatic join")
+
+-- =====================================
+-- Auto Join
+-- =====================================
+local AutoJoinToggle = Tabs.Gameworks:AddToggle("AutoJoin_Toggle", {
+    Title = "Auto Join", 
+    Default = false
+})
+
+AutoJoinToggle:OnChanged(function()
+    getgenv().AutoJoin = Options.AutoJoin_Toggle.Value
+    if getgenv().AutoJoin then
+        startAutoJoinLoop()
+        enableDropdownUpdates() 
+    else
+        disableDropdownUpdates()
+    end
+end)
+
+function startAutoJoinLoop()
+    spawn(function()
+        local lastJoinedArena = nil
+        local lastJoinedSide = nil
+        local lastJoinedSlot = nil
+        local lastTargetPlayer = nil
+        local joinAttempts = {}
+        
+        while getgenv().AutoJoin do
+            wait(0.1) 
+
+            if isInGame() then
+                wait(0.5)
+                continue
+            end
+            
+            local isInArena, currentArena, currentSide, currentSlot, isInsideHull = checkPlayerArenaStatus()
+            
+            if isInArena then
+                if not isInsideHull then
+                    if autoFixPosition(currentArena, currentSide, currentSlot) then
+                    else
+                        teleportToWorldSpawn()
+                    end
+                    wait(1)
+                    continue
+                end
+                
+                local playersInCurrentArena = {}
+                if currentArena and currentArena:FindFirstChild("Slots") then
+                    for _, side in pairs({"Left", "Right"}) do
+                        if currentArena.Slots:FindFirstChild(side) then
+                            for i = 1, 4 do
+                                local slot = currentArena.Slots[side]:FindFirstChild(tostring(i))
+                                if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") and slot.Data.Player.Value then
+                                    local player = slot.Data.Player.Value
+                                    if player ~= localPlayer and player.Parent and not isSlotInGame(currentArena, side, i) then
+                                        table.insert(playersInCurrentArena, player)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+
+                if #playersInCurrentArena == 0 then
+                    teleportToWorldSpawn()
+                    wait(0.2)
+                    continue
+                end
+
+                local readyVisible, readyPrompt = isReadyPromptVisible()
+                if readyVisible and readyPrompt and readyPrompt.Text == "Ready" then
+                    fireReadyRemote()
+                end
+                wait(0.2)
+                continue
+            end
+            
+            local foundArena, foundSide, foundSlot, foundPlayer
+            if getgenv().TargetPlayer == "all" then
+                foundArena, foundSide, foundSlot, foundPlayer = findPlayerInArenas(nil)
+            else
+                local targetPlayer = findTargetPlayer(getgenv().TargetPlayer)
+                if targetPlayer and targetPlayer.Parent then 
+                    foundArena, foundSide, foundSlot, foundPlayer = findPlayerInArenas(targetPlayer)
+                end
+            end
+            
+            if foundArena and foundSide and foundSlot then
+                local targetSide, targetSlot = findBestSlotOpposite(foundArena, foundSide, foundSlot, foundPlayer)
+                
+                if not targetSide or not targetSlot then
+                    wait(.2) 
+                    continue
+                end
+                
+                local targetSlotObj = foundArena.Slots[targetSide]:FindFirstChild(tostring(targetSlot))
+                if targetSlotObj and targetSlotObj:FindFirstChild("Data") and targetSlotObj.Data:FindFirstChild("Player") then
+                    if targetSlotObj.Data.Player.Value == nil and not isSlotInGame(foundArena, targetSide, targetSlot) then
+                        if not isAnyPlayerInGameInArena(foundArena) then
+                            local attemptKey = foundArena.Name .. "_" .. targetSide .. "_" .. targetSlot
+                            
+                            if not joinAttempts[attemptKey] then
+                                joinAttempts[attemptKey] = 0
+                            end
+                            
+                            if joinAttempts[attemptKey] >= 3 then
+                                teleportToWorldSpawn()
+                                joinAttempts[attemptKey] = 0 
+                                wait(1)
+                                continue
+                            end
+                            
+                            local joinSuccess = joinArenaSlot(foundArena, targetSide, targetSlot)
+                            
+                            if joinSuccess then
+                                wait(0.1)
+                                
+                                local actuallyJoined = false
+                                local currentIsInArena, currentArenaCheck, currentSideCheck, currentSlotCheck = checkPlayerArenaStatus()
+                                
+                                if currentIsInArena and currentArenaCheck == foundArena and currentSideCheck == targetSide and currentSlotCheck == targetSlot then
+                                    actuallyJoined = true
+                                end
+                                
+                                if not actuallyJoined then
+                                    local slotCheck = foundArena.Slots[targetSide]:FindFirstChild(tostring(targetSlot))
+                                    if slotCheck and slotCheck:FindFirstChild("Data") and slotCheck.Data:FindFirstChild("Player") then
+                                        if slotCheck.Data.Player.Value == localPlayer then
+                                            actuallyJoined = true
+                                        end
+                                    end
+                                end
+                                
+                                if actuallyJoined then
+                                    lastJoinedArena = foundArena
+                                    lastJoinedSide = targetSide
+                                    lastJoinedSlot = targetSlot
+                                    lastTargetPlayer = foundPlayer
+                                    
+                                    joinAttempts[attemptKey] = 0                                    
+                                    wait(0.1)
+                                    
+                                    local readyVisible, readyPrompt = isReadyPromptVisible()
+                                    if readyVisible and readyPrompt and readyPrompt.Text == "Ready" then
+                                        fireReadyRemote()
+                                    end
+                                else
+                                    joinAttempts[attemptKey] = joinAttempts[attemptKey] + 1
+                                    
+                                    teleportToWorldSpawn()
+                                    wait(1)
+                                end
+                            else
+                                joinAttempts[attemptKey] = joinAttempts[attemptKey] + 1
+                                
+                                teleportToWorldSpawn()
+                                wait(0.1)
+                            end
+                        end
+                    end
+                end
+            else
+                wait(0.4) 
+            end
+        end
+    end)
+end
+
+function findBestSlotOpposite(arena, playerSide, playerSlot, targetPlayer)
+    if not arena or not arena:FindFirstChild("Slots") then
+        return nil, nil
+    end
+    
+    local oppositeSide = (playerSide == "Left") and "Right" or "Left"
+    
+    if arena.Slots:FindFirstChild(oppositeSide) then
+        for i = 1, 4 do
+            local slot = arena.Slots[oppositeSide]:FindFirstChild(tostring(i))
+            if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                if slot.Data.Player.Value == nil and not isSlotInGame(arena, oppositeSide, i) then
+                    return oppositeSide, i
+                end
+            end
+        end
+    end
+    
+    if arena.Slots:FindFirstChild(playerSide) then
+        for i = 1, 4 do
+            if i ~= playerSlot then 
+                local slot = arena.Slots[playerSide]:FindFirstChild(tostring(i))
+                if slot and slot:FindFirstChild("Data") and slot.Data:FindFirstChild("Player") then
+                    if slot.Data.Player.Value == nil and not isSlotInGame(arena, playerSide, i) then
+                        return playerSide, i
+                    end
+                end
+            end
+        end
+    end
+    
+    return nil, nil
+end
+
+
+
+local JoinModeDropdown = Tabs.Gameworks:AddDropdown("JoinMode_Dropdown", {
+    Title = "Join Mode",
+    Values = {"infection", "team"},
+    Multi = false,
+    Default = 1,
+})
+
+JoinModeDropdown:OnChanged(function(Value)
+    getgenv().JoinMode = Value
+end)
+
+local TargetPlayerDropdown = Tabs.Gameworks:AddDropdown("TargetPlayer_Dropdown", {
+    Title = "Target Player",
+    Values = getAllPlayerNames(),
+    Multi = false,
+    Default = 1,
+})
+
+TargetPlayerDropdown:OnChanged(function(Value)
+    getgenv().TargetPlayer = Value
+end)
+
+spawn(function()
+    while true do
+        wait(10)
+        updatePlayerDropdown()
+    end
+end)
+
+local playerAddedDebounce = false
+local playerRemovedDebounce = false
+
+game.Players.PlayerAdded:Connect(function()
+    if playerAddedDebounce then return end
+    playerAddedDebounce = true
+    
+    wait(2)
+    updatePlayerDropdown()
+    playerAddedDebounce = false
+end)
+
+game.Players.PlayerRemoving:Connect(function()
+    if playerRemovedDebounce then return end
+    playerRemovedDebounce = true
+    
+    wait(2)
+    updatePlayerDropdown()
+    playerRemovedDebounce = false
+end)
+
+spawn(function()
+    while true do
+        wait(120) 
+        local currentTime = tick()
+        
+        for key, time in pairs(joinCooldown) do
+            if (currentTime - time) > 300 then  
+                joinCooldown[key] = nil
+            end
+        end
+        if #joinAttempts > 50 then
+            joinAttempts = {}
+        end
+        
+        if enemyDetectionCache.time and (currentTime - enemyDetectionCache.time) > 10 then
+            enemyDetectionCache = {}
+        end
+    end
+end)
+
+Tabs.Gameworks:AddSection("More")
+
+local Toggle = Tabs.Gameworks:AddToggle("Bomb_Resize", {Title = "Bomb Resize", Default = false})
+
+Toggle:OnChanged(function()
+    getgenv().BombResize = Options.Bomb_Resize.Value
+
+    if getgenv().BombResize then
+        startBombLoop()
+    else
+        getgenv().BombResize = false
+    end
+end)
+
+function startBombLoop()
+    spawn(function()
+        while getgenv().BombResize do
+            task.wait(.2)
+
+            local Players = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer
+
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player.Character then
+                    local tool = player.Character:FindFirstChildOfClass("Tool")
+                    if tool then
+                        for _, part in pairs(tool:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                if player == LocalPlayer then
+                                    part.Size = Vector3.new(10, 10, 10) 
+                                else
+                                    part.Size = Vector3.new(2, 2, 2) 
+                                end
+                                part.Massless = true
+                                part.CanCollide = false
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local Toggle = Tabs.Gameworks:AddToggle("Lava_Copy", {Title = "Auto Lava Close", Default = false})
+
+local copiedLavaObjects = {}
+local lavaDataCache = {}
+
+function findLavaInWorkspace(parent)
+    local lavaObjects = {}
+    
+    for _, child in pairs(parent:GetChildren()) do
+        if child.Name == "Lava" then
+            table.insert(lavaObjects, child)
+        end
+        
+        if #child:GetChildren() > 0 then
+            local subLava = findLavaInWorkspace(child)
+            for _, lava in pairs(subLava) do
+                table.insert(lavaObjects, lava)
+            end
+        end
+    end
+    
+    return lavaObjects
+end
+
+function copyLavaObject(originalLava)
+    local copy = originalLava:Clone()
+    copy.Transparency = 1
+    copy.Name = "LavaCopy_" .. originalLava.Name .. "_" .. tostring(originalLava:GetDebugId())
+    
+    local originalPosition = originalLava.Position
+    copy.Position = Vector3.new(originalPosition.X, originalPosition.Y + 1, originalPosition.Z)
+    
+    copy.Parent = workspace
+    copy.CanCollide = true
+    
+    local lavaId = tostring(originalLava:GetDebugId())
+    copiedLavaObjects[lavaId] = {original = originalLava, copy = copy}
+    lavaDataCache[lavaId] = {
+        position = originalPosition,
+        size = originalLava.Size
+    }
+    
+    return copy
+end
+
+function cleanupCopiedLava()
+    for _, lavaData in pairs(copiedLavaObjects) do
+        if lavaData.copy and lavaData.copy.Parent then
+            lavaData.copy:Destroy()
+        end
+    end
+    
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj.Name:find("LavaCopy_") then
+            obj:Destroy()
+        end
+    end
+    
+    copiedLavaObjects = {}
+    lavaDataCache = {}
+end
+
+function updateLavaCopy(lavaId, originalLava)
+    local lavaData = copiedLavaObjects[lavaId]
+    if lavaData and lavaData.copy and lavaData.copy.Parent then
+        local newPosition = originalLava.Position
+        lavaData.copy.Position = Vector3.new(newPosition.X, newPosition.Y + 3, newPosition.Z)
+        lavaData.copy.Size = originalLava.Size
+        
+        lavaDataCache[lavaId] = {
+            position = newPosition,
+            size = originalLava.Size
+        }
+    end
+end
+
+function hasLavaChanged(lavaId, currentLava)
+    local cachedData = lavaDataCache[lavaId]
+    if not cachedData then return true end
+    
+    local positionChanged = (cachedData.position - currentLava.Position).Magnitude > 0.1
+    local sizeChanged = (cachedData.size - currentLava.Size).Magnitude > 0.1
+    
+    return positionChanged or sizeChanged
+end
+
+function startLavaCopyLoop()
+    spawn(function()
+        while getgenv().AutoLavaCopy do 
+            task.wait(.3)
+
+            if not getgenv().AutoLavaCopy then break end
+
+            local lavaObjects = findLavaInWorkspace(workspace)
+            
+            for _, lava in pairs(lavaObjects) do
+                if not getgenv().AutoLavaCopy then break end
+
+                local lavaId = tostring(lava:GetDebugId())
+                local alreadyCopied = copiedLavaObjects[lavaId] ~= nil
+                
+                if not alreadyCopied then
+                    copyLavaObject(lava)
+                elseif hasLavaChanged(lavaId, lava) then
+                    updateLavaCopy(lavaId, lava)
+                end
+            end
+        end
+    end)
+end
+
+
+Toggle:OnChanged(function()
+    getgenv().AutoLavaCopy = Options.Lava_Copy.Value
+
+    if getgenv().AutoLavaCopy then
+        startLavaCopyLoop()
+    else
+        getgenv().AutoLavaCopy = false
+        cleanupCopiedLava()
+    end
+end)
+
+
+
+
+    Tabs.Gameworks:AddButton({
+    Title = "Disable Ice",
+    Callback = function()
+         workspace.Arenas.Arena5ICED.Map.Ice.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0)
+    end
+})
+end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/main/main/NoGame.lua"))()

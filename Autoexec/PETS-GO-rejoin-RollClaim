@@ -1,0 +1,35 @@
+--[[
+Simple script to rejoin the Claim Roll topic.
+Change [number] to an exact number or a range such as 10-1000.
+]]
+
+local targetValue = tostring(getgenv().targetValue or "")
+local players = game:GetService("Players")
+local teleportService = game:GetService("TeleportService")
+local localPlayer = players.LocalPlayer
+
+local function shouldRejoin(extractedNumber)
+    if targetValue == "" then
+        return false
+    end
+
+    if targetValue:find("%-") then
+        local minValue, maxValue = targetValue:match("^(%d+)%-(%d+)$")
+        minValue = tonumber(minValue)
+        maxValue = tonumber(maxValue)
+        return minValue and maxValue and extractedNumber >= minValue and extractedNumber <= maxValue
+    end
+
+    local targetNumber = tonumber(targetValue)
+    return targetNumber and extractedNumber == targetNumber
+end
+
+local titleLabel = workspace.MAP.INTERACT.RetentionDice.Billboard.BillboardGui.Title
+local numberText = titleLabel.Text:match("%d[,%d]*")
+
+if numberText then
+    local extractedNumber = tonumber(numberText:gsub(",", ""))
+    if extractedNumber and not shouldRejoin(extractedNumber) then
+        teleportService:Teleport(game.PlaceId, localPlayer)
+    end
+end
