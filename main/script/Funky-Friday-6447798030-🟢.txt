@@ -380,3 +380,5 @@ getgenv().ScriptGe = function()
     Tabs.Gameworks:AddParagraph({Title = "Autoplay method 'Hybrid'", Content = "The most laggy one; Doing calculate & rapid checks"})
     Tabs.Gameworks:AddParagraph({Title = "Other Info", Content = "Scroll speed accuracy buffer is used for adjusting note hit accuracy.\nNote hold duration: how long for the key will be pressed, when hitthing the note."})
 end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/main/NoGame.lua"))()
