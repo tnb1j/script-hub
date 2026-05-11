@@ -653,6 +653,16 @@ do
         end
     })
 
+    Tabs.Universal:AddSection("Development & Debugging")
+
+    Tabs.Universal:AddButton({
+        Title = "Execute Ketamine",
+        Description = "Advanced script scanner, memory scanner, and remote spy suite.",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Ketamine.lua"))()
+        end
+    })
+
     Tabs.Universal:AddButton({
         Title = "Execute Hydroxide",
         Description = "Roblox remote spy and debugger.",
@@ -680,6 +690,14 @@ do
         Description = "Roblox explorer and debugger.",
         Callback = function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+        end
+    })
+
+    Tabs.Universal:AddButton({
+        Title = "Execute GokuDex",
+        Description = "Custom Roblox explorer and instance viewer.",
+        Callback = function()
+            loadstring(game:HttpGet("https://github.com/gokuthug1/GokuDex/raw/refs/heads/main/GokuDex.lua"))()
         end
     })
     Tabs.Universal:AddSection("Client Utilities")
@@ -992,14 +1010,6 @@ do
                 warn("[gokuthug1's Hub] Failed to load AimBot+ESP from all sources.")
                 Fluent:Notify({ Title = "AimBot+ESP", Content = "Failed to load. Check console.", Duration = 5 })
             end
-        end
-    })
-
-    Tabs.Universal:AddButton({
-        Title = "Execute GokuDex",
-        Description = "Custom Roblox explorer and instance viewer.",
-        Callback = function()
-            loadstring(game:HttpGet("https://github.com/gokuthug1/GokuDex/raw/refs/heads/main/GokuDex.lua"))()
         end
     })
 
