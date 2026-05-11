@@ -1,0 +1,382 @@
+getgenv().Tabs = nil
+getgenv().Options = nil
+getgenv().Window = nil
+
+getgenv().GameName = "Funky Friday"
+
+if getgenv().ScriptGe then
+    getgenv().ScriptGe = nil
+end
+
+getgenv().ScriptGe = function()
+    local defaults = {
+        Autoplay = false,
+        AutoplayMethod = 2,
+        Limit = 50,
+        CalculateRenders = 5,
+        RapidRenders = 1,
+        HoldDuration = 0,
+        RandomAdd = 0,
+        PerfectSick = true,
+        SimpleMode = false
+    }
+
+    local vals = table.clone(defaults)
+    local cons = { }
+
+    local function getGlobalTable()
+        return typeof(getfenv().getgenv) == "function" and typeof(getfenv().getgenv()) == "table" and getfenv().getgenv() or _G
+    end
+
+    getGlobalTable().FireHubLoaded = true
+    local closed = false
+    local plr = game:GetService("Players").LocalPlayer
+
+    local rs = game:GetService("RunService")
+    local function r(times)
+        local dt = 0
+        for i=1, tonumber(times) or 1 do
+            dt += rs.RenderStepped:Wait()
+        end
+        return dt
+    end
+
+    local function getClosest(toIterate)
+        local c, d = nil, math.huge
+        for _, v in toIterate:GetChildren() do
+            if plr.Character and plr.Character:GetPivot() then
+                local m = (v:GetPivot().Position - plr.Character:GetPivot().Position).Magnitude
+                if m < d then
+                    c, d = v, m
+                end
+            end
+        end
+        return c, d
+    end
+
+    local function getMyStage()
+        if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Stages") then
+            return getClosest(workspace.Map.Stages)
+        end
+    end
+
+    local function getMySide()
+        local stage = getMyStage()
+        if stage then
+            local node = getClosest(stage.Nodes)
+            if node then
+                return node.Name:sub(1, node.Name:find("_") - 1)
+            end
+        end
+    end
+
+    local side = getMySide() or "Left"
+    task.spawn(function()
+        while not closed and task.wait(1) and r() do
+            side = getMySide() or side
+        end
+    end)
+
+    local lanes = 0
+    local scrollSpeeds = { }
+
+    local function appendScrollSpeed(newSpeed, dontUseCache)
+        if (not dontUseCache or #scrollSpeeds == 0) and newSpeed > 0 then        
+            table.insert(scrollSpeeds, 1, newSpeed)
+        end
+
+        while #scrollSpeeds > vals.Limit do
+            table.remove(scrollSpeeds, #scrollSpeeds)
+        end
+
+        local sum = 0
+        for _, v in scrollSpeeds do
+            sum += v
+        end
+
+        return math.max(sum / #scrollSpeeds, newSpeed)
+    end
+
+    local function getDistance(x, y)
+        return math.abs(math.max(x, y) - math.min(x, y))
+    end
+
+    local binds = {
+        [4] = { [1] = "Left", [2] = "Down", [3] = "Up", [4] = "Right" },
+        [5] = { [1] = "D", [2] = "F", [3] = "Space", [4] = "J", [5] = "K" },
+        [6] = { [1] = "S", [2] = "D", [3] = "F", [4] = "J", [5] = "K", [6] = "L" },
+        [7] = { [1] = "S", [2] = "D", [3] = "F", [4] = "Space", [5] = "J", [6] = "K", [7] = "L" },
+        [8] = { [1] = "A", [2] = "S", [3] = "D", [4] = "F", [5] = "J", [6] = "K", [7] = "L", [8] = "Semicolon" },
+        [9] = { [1] = "A", [2] = "S", [3] = "D", [4] = "F", [5] = "Space", [6] = "J", [7] = "K", [8] = "L", [9] = "Semicolon" }
+    }
+
+    local vim = game:GetService("VirtualInputManager")
+    local keys = { }
+    local downKeys = { }
+
+    local sendEvent = function(key, isDown)
+        downKeys[key] = isDown
+        vim:SendKeyEvent(isDown, key, false, game)
+    end
+
+    local function pressKey(key, duration)
+        if downKeys[key] then
+            r(1)
+            sendEvent(key, false)
+        end
+
+        local myId = (keys[key] or 0) + 1
+        keys[key] = myId
+
+        sendEvent(key, true)
+
+        if duration and duration > 0 then
+            task.wait(duration)
+        end
+
+        if keys[key] == myId then
+            sendEvent(key, false)
+        end
+    end
+
+    local hit = { }
+    local function hitNote(note, scrollSpeed, key)
+        if not vals.Autoplay or hit[note] then return end
+        hit[note] = true
+
+        local time = 0
+        for _, v in note:GetChildren() do
+            if v and v.Size ~= UDim2.fromScale(1, 1) then
+                time = math.abs(v.Size.Y.Scale / math.abs(scrollSpeed - 1)) + 0.35
+                break
+            end
+        end
+
+        time += (math.random(-vals.RandomAdd, vals.RandomAdd) + vals.HoldDuration) / 1000
+        if time <= 0 and (vals.RandomAdd ~= 0 or vals.HoldDuration ~= 0) then
+            time = 0.001
+        end
+
+        task.spawn(pressKey, key, time > 0 and time)
+
+        note:GetPropertyChangedSignal("Parent"):Wait()
+        hit[note] = false
+    end
+
+    local offsets = { Sick = 0.05, Good = 0.1, Ok = 0.15, Bad = 0.2, Miss = 0.4 }
+    local chances = { {"Sick", 100}, {"Good", 0}, {"Ok", 0}, {"Bad", 0}, {"Miss", 0} }
+
+    local function rollChance()
+        local total = 0
+        local allZeros = true
+        for _, chance in chances do
+            if chance[2] ~= 0 then
+                allZeros = false
+                if chance[2] == 100 then return chance[1] end
+                total += chance[2]
+            end
+        end
+        if allZeros then return "Sick" end
+
+        local rnd, cum = math.random(total), 0
+        for _, chance in chances do
+            if chance[2] ~= 0 then
+                cum += chance[2]
+                if rnd <= cum then return chance[1] end
+            end
+        end
+        return "Sick"
+    end
+
+    local function calculate(note, renders, dontUseCache)
+        local originalY = note.Position.Y.Scale
+        local deltaTime = r(renders)
+        local newY = note.Position.Y.Scale
+        local scrollSpeed = appendScrollSpeed(getDistance(originalY, newY) / deltaTime, dontUseCache)
+        return getDistance(newY, 0.5) / scrollSpeed, scrollSpeed
+    end
+
+    local function calculateMethod(note, laneIndex)
+        local timeToReachTarget, scrollSpeed = calculate(note, vals.CalculateRenders)
+        local rolled = rollChance()
+        if rolled == "Sick" and vals.PerfectSick then
+            task.wait(timeToReachTarget - 0.0085)
+        else
+            task.wait(timeToReachTarget - offsets[rolled] + 0.0085)
+        end
+        hitNote(note, scrollSpeed, Enum.KeyCode:FromName(binds[lanes][laneIndex]))
+    end
+
+    local function rapidDistanceCheckMethod(note, laneIndex)
+        local rolled = rollChance()
+        local got = offsets[rolled]
+        while note and note.Parent do
+            local timeToReachTarget, scrollSpeed = calculate(note, vals.RapidRenders)
+            if timeToReachTarget <= got - 0.01 then
+                if rolled == "Sick" and vals.PerfectSick then
+                    task.wait(timeToReachTarget)
+                end
+                hitNote(note, scrollSpeed, Enum.KeyCode:FromName(binds[lanes][laneIndex]))
+            end
+        end
+    end
+
+    local function simpleCheck(obj)
+        if obj.Name ~= "1" then obj:Destroy() end
+    end
+
+    local function simpleIterate(v)
+        for _, va in v:GetChildren() do simpleCheck(va) end
+        v.ChildAdded:Connect(simpleCheck)
+    end
+
+    local function onNoteAdded(note, laneIndex)
+        if vals.SimpleMode then
+            for _, v in note:GetChildren() do simpleIterate(v) end
+            note.ChildAdded:Connect(simpleIterate)
+        end
+        
+        if vals.AutoplayMethod == 1 then
+            calculateMethod(note, laneIndex)
+        elseif vals.AutoplayMethod == 2 then
+            rapidDistanceCheckMethod(note, laneIndex)
+        else
+            task.spawn(calculateMethod, note, laneIndex)
+            task.spawn(rapidDistanceCheckMethod, note, laneIndex)
+        end
+    end
+
+    local function onLaneAdded(lane)
+        if lane and lane:IsA("Frame") and tonumber(lane.Name:gsub("Lane", "") .. "") then
+            local laneIndex = tonumber(lane.Name:gsub("Lane", "") .. "")
+            lanes = math.max(laneIndex, lanes)
+            local notes = lane:WaitForChild("Notes", 9e9)
+            cons[#cons + 1] = notes.ChildAdded:Connect(function(note)
+                onNoteAdded(note, laneIndex)
+            end)
+            for _, note in notes:GetChildren() do
+                task.spawn(onNoteAdded, note, laneIndex)
+            end
+        end
+    end
+
+    local function onScreenAdded(screen)
+        if screen and screen.Name == "Window" then
+            lanes = 0
+            local myField = screen:WaitForChild("Game", 9e9):WaitForChild("Fields", 9e9):WaitForChild(side, 9e9):WaitForChild("Inner", 9e9)
+            cons[#cons + 1] = myField.ChildAdded:Connect(onLaneAdded)
+            for _, lane in myField:GetChildren() do onLaneAdded(lane) end
+        end
+    end
+
+    if plr.PlayerGui:FindFirstChild("Window") then
+        onScreenAdded(plr.PlayerGui.Window)
+    end
+    cons[#cons + 1] = plr.PlayerGui.ChildAdded:Connect(onScreenAdded)
+
+    if getgenv().FFCleanup then
+        pcall(function() getgenv().FFCleanup() end)
+    end
+    getgenv().FFCleanup = function()
+        for i,v in pairs(defaults) do vals[i] = v end
+        getGlobalTable().FireHubLoaded = false
+        closed = true
+        r(3)
+        for i,v in pairs(cons) do v:Disconnect() end
+    end
+
+    Tabs.Gameworks:AddSection("Auto play")
+    Tabs.Gameworks:AddParagraph({Title = "Notice", Content = "Works best with downscroll"})
+
+    Tabs.Gameworks:AddToggle("FF_Autoplay", {Title = "Autoplay", Default = false}):OnChanged(function()
+        vals.Autoplay = Options.FF_Autoplay.Value
+    end)
+
+    for i, chance in ipairs(chances) do
+        Tabs.Gameworks:AddSlider("FF_Chance_" .. chance[1], {
+            Title = chance[1] .. " chance",
+            Default = chance[2],
+            Min = 0,
+            Max = 100,
+            Rounding = 0,
+            Callback = function(val)
+                chance[2] = val
+            end
+        })
+    end
+
+    Tabs.Gameworks:AddSection("Keys")
+    for keysCount = 4, 9 do
+        local bind = binds[keysCount]
+        Tabs.Gameworks:AddParagraph({Title = "Key Bindings", Content = keysCount .. " key mode bind setup"})
+        for key, val in pairs(bind) do
+            Tabs.Gameworks:AddInput("FF_Key_" .. keysCount .. "_" .. key, {
+                Title = "Lane #" .. key,
+                Default = val,
+                Callback = function(text)
+                    if Enum.KeyCode[text] then
+                        bind[key] = text
+                    end
+                end
+            })
+        end
+    end
+
+    Tabs.Gameworks:AddSection("Advanced")
+    
+    Tabs.Gameworks:AddSlider("FF_HoldDuration", {
+        Title = "Note hold duration (ms)",
+        Default = 0, Min = 0, Max = 1000, Rounding = 0,
+        Callback = function(val) vals.HoldDuration = val end
+    })
+
+    Tabs.Gameworks:AddSlider("FF_RandomHold", {
+        Title = "Random note hold duration (ms)",
+        Default = 0, Min = 0, Max = 250, Rounding = 0,
+        Callback = function(val) vals.RandomAdd = val end
+    })
+
+    Tabs.Gameworks:AddSlider("FF_ScrollLimit", {
+        Title = "Scroll speed accuracy buffer",
+        Default = vals.Limit, Min = 1, Max = 50, Rounding = 0,
+        Callback = function(val) vals.Limit = val end
+    })
+
+    Tabs.Gameworks:AddSlider("FF_CalcTime", {
+        Title = "Calculate method time (frames)",
+        Default = vals.CalculateRenders, Min = 1, Max = 10, Rounding = 0,
+        Callback = function(val) vals.CalculateRenders = val end
+    })
+
+    Tabs.Gameworks:AddSlider("FF_RapidTime", {
+        Title = "Rapid check delay (frames)",
+        Default = vals.RapidRenders, Min = 1, Max = 10, Rounding = 0,
+        Callback = function(val) vals.RapidRenders = val end
+    })
+
+    Tabs.Gameworks:AddDropdown("FF_AutoMethod", {
+        Title = "Autoplay method",
+        Values = {"Calculate", "Rapid checks", "Hybrid"},
+        Default = vals.AutoplayMethod,
+        Multi = false
+    }):OnChanged(function(val)
+        if val == "Calculate" then vals.AutoplayMethod = 1
+        elseif val == "Rapid checks" then vals.AutoplayMethod = 2
+        elseif val == "Hybrid" then vals.AutoplayMethod = 3
+        end
+    end)
+
+    Tabs.Gameworks:AddToggle("FF_PerfectSick", {Title = "Perfect sick (Sick hits way closer to 0ms)", Default = vals.PerfectSick}):OnChanged(function()
+        vals.PerfectSick = Options.FF_PerfectSick.Value
+    end)
+
+    Tabs.Gameworks:AddToggle("FF_SimpleMode", {Title = "Simple arrow style (not FE)", Default = vals.SimpleMode}):OnChanged(function()
+        vals.SimpleMode = Options.FF_SimpleMode.Value
+    end)
+
+    Tabs.Gameworks:AddSection("Info")
+    Tabs.Gameworks:AddParagraph({Title = "Autoplay method 'Calculate'", Content = "When the note spawns, it gets approximate time to be hit"})
+    Tabs.Gameworks:AddParagraph({Title = "Autoplay method 'Rapid check'", Content = "Every X frames it doing a check, if note can be hitten"})
+    Tabs.Gameworks:AddParagraph({Title = "Autoplay method 'Hybrid'", Content = "The most laggy one; Doing calculate & rapid checks"})
+    Tabs.Gameworks:AddParagraph({Title = "Other Info", Content = "Scroll speed accuracy buffer is used for adjusting note hit accuracy.\nNote hold duration: how long for the key will be pressed, when hitthing the note."})
+end
