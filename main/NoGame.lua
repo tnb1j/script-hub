@@ -157,6 +157,19 @@ do
         end
     end
 
+    Tabs.Update:AddButton({
+        Title = "Check for Updates",
+        Description = "Force a fresh fetch of the latest hub build from GitHub.",
+        Callback = function()
+            Fluent:Notify({
+                Title = "Updater",
+                Content = "Checking for updates... Re-initializing hub.",
+                Duration = 5
+            })
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/main/loader.lua"))()
+        end
+    })
+
     -- =====================================
     -- UI: ENVIRONMENT CONTEXT DEPLOYER
     -- =====================================
