@@ -1,3 +1,13 @@
+if getgenv().Window then
+    pcall(function()
+        if getgenv()._FluentLib then
+            getgenv()._FluentLib:Destroy()
+        end
+    end)
+    getgenv().Window = nil
+    getgenv()._FluentLib = nil
+end
+
 local Fluent = getgenv()._FluentLib or loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
