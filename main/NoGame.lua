@@ -923,58 +923,147 @@ do
     ExecutorFrame.Size = UDim2.new(1, -10, 0, 360) -- Takes up almost all the space
     ExecutorFrame.BackgroundTransparency = 1
     
+    -- Main Editor Container
+    local EditorContainer = Instance.new("Frame")
+    EditorContainer.Size = UDim2.new(1, 0, 1, -45)
+    EditorContainer.Position = UDim2.new(0, 0, 0, 0)
+    EditorContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 30) -- Monaco surface
+    EditorContainer.BorderSizePixel = 0
+    EditorContainer.Parent = ExecutorFrame
+    local EditorCorner = Instance.new("UICorner", EditorContainer)
+    EditorCorner.CornerRadius = UDim.new(0, 8)
+    local EditorStroke = Instance.new("UIStroke", EditorContainer)
+    EditorStroke.Color = Color3.fromRGB(60, 60, 60)
+    EditorStroke.Transparency = 0.4
+    
+    -- Line Numbers Gutter
+    local Gutter = Instance.new("ScrollingFrame")
+    Gutter.Size = UDim2.new(0, 35, 1, 0)
+    Gutter.BackgroundColor3 = Color3.fromRGB(37, 37, 38)
+    Gutter.BorderSizePixel = 0
+    Gutter.ScrollBarThickness = 0
+    Gutter.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Gutter.Parent = EditorContainer
+    local GutterCorner = Instance.new("UICorner", Gutter)
+    GutterCorner.CornerRadius = UDim.new(0, 8)
+    
+    -- Fix corner bleed for Gutter
+    local GutterFix = Instance.new("Frame")
+    GutterFix.Size = UDim2.new(0, 10, 1, 0)
+    GutterFix.Position = UDim2.new(1, -10, 0, 0)
+    GutterFix.BackgroundColor3 = Color3.fromRGB(37, 37, 38)
+    GutterFix.BorderSizePixel = 0
+    GutterFix.Parent = Gutter
+    
+    local LineNumbers = Instance.new("TextLabel")
+    LineNumbers.Size = UDim2.new(1, -5, 1, 0)
+    LineNumbers.Position = UDim2.new(0, 0, 0, 8)
+    LineNumbers.BackgroundTransparency = 1
+    LineNumbers.TextColor3 = Color3.fromRGB(133, 133, 133)
+    LineNumbers.Font = Enum.Font.RobotoMono
+    LineNumbers.TextSize = 13
+    LineNumbers.TextXAlignment = Enum.TextXAlignment.Right
+    LineNumbers.TextYAlignment = Enum.TextYAlignment.Top
+    LineNumbers.Text = "1"
+    LineNumbers.Parent = Gutter
+    
+    -- Code TextBox
+    local CodeScroll = Instance.new("ScrollingFrame")
+    CodeScroll.Size = UDim2.new(1, -45, 1, 0)
+    CodeScroll.Position = UDim2.new(0, 45, 0, 0)
+    CodeScroll.BackgroundTransparency = 1
+    CodeScroll.ScrollBarThickness = 4
+    CodeScroll.ScrollBarImageColor3 = Color3.fromRGB(70, 70, 70)
+    CodeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    CodeScroll.Parent = EditorContainer
+
     local CodeBox = Instance.new("TextBox")
-    CodeBox.Size = UDim2.new(1, 0, 1, -40)
-    CodeBox.Position = UDim2.new(0, 0, 0, 0)
-    CodeBox.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    CodeBox.BackgroundTransparency = 0.4
-    CodeBox.TextColor3 = Color3.fromRGB(230, 230, 230)
-    CodeBox.Font = Enum.Font.Code
-    CodeBox.TextSize = 14
+    CodeBox.Size = UDim2.new(1, -10, 1, -16)
+    CodeBox.Position = UDim2.new(0, 0, 0, 8)
+    CodeBox.BackgroundTransparency = 1
+    CodeBox.TextColor3 = Color3.fromRGB(212, 212, 212)
+    CodeBox.Font = Enum.Font.RobotoMono
+    CodeBox.TextSize = 13
     CodeBox.TextXAlignment = Enum.TextXAlignment.Left
     CodeBox.TextYAlignment = Enum.TextYAlignment.Top
     CodeBox.MultiLine = true
     CodeBox.ClearTextOnFocus = false
     CodeBox.Text = "-- Write Lua script here..."
-    CodeBox.Parent = ExecutorFrame
-    local uic = Instance.new("UICorner", CodeBox)
-    uic.CornerRadius = UDim.new(0, 6)
-    local stroke = Instance.new("UIStroke", CodeBox)
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Transparency = 0.9
+    CodeBox.Parent = CodeScroll
+    
+    -- Auto line number updater and scroll sync
+    local function updateLineNumbers()
+        local text = CodeBox.Text
+        local _, count = text:gsub("\n", "\n")
+        local lines = ""
+        for i = 1, count + 1 do
+            lines = lines .. i .. "\n"
+        end
+        LineNumbers.Text = lines
+        
+        -- Adjust Canvas Size based on text bounds
+        local textBounds = CodeBox.TextBounds
+        CodeBox.Size = UDim2.new(1, -10, 0, math.max(textBounds.Y, CodeScroll.AbsoluteSize.Y - 16))
+        CodeScroll.CanvasSize = UDim2.new(0, textBounds.X + 20, 0, CodeBox.Size.Y.Offset + 16)
+        Gutter.CanvasSize = UDim2.new(0, 0, 0, CodeBox.Size.Y.Offset + 16)
+        LineNumbers.Size = UDim2.new(1, -5, 0, CodeBox.Size.Y.Offset)
+    end
+    
+    CodeBox:GetPropertyChangedSignal("Text"):Connect(updateLineNumbers)
+    CodeBox:GetPropertyChangedSignal("TextBounds"):Connect(updateLineNumbers)
+    CodeScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+        Gutter.CanvasPosition = Vector2.new(0, CodeScroll.CanvasPosition.Y)
+    end)
+    task.spawn(updateLineNumbers)
+    
+    -- Toolbar Frame
+    local Toolbar = Instance.new("Frame")
+    Toolbar.Size = UDim2.new(1, 0, 0, 35)
+    Toolbar.Position = UDim2.new(0, 0, 1, -35)
+    Toolbar.BackgroundTransparency = 1
+    Toolbar.Parent = ExecutorFrame
+    
+    local function createModernButton(text, pos, color)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.48, 0, 1, 0)
+        btn.Position = pos
+        btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        btn.Text = "  " .. text
+        btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+        btn.Font = Enum.Font.GothamMedium
+        btn.TextSize = 13
+        btn.AutoButtonColor = false
+        
+        local corner = Instance.new("UICorner", btn)
+        corner.CornerRadius = UDim.new(0, 6)
+        local stroke = Instance.new("UIStroke", btn)
+        stroke.Color = Color3.fromRGB(75, 75, 75)
+        stroke.Transparency = 0.5
+        
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
+            TweenService:Create(stroke, TweenInfo.new(0.2), {Color = color}):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
+            TweenService:Create(stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(75, 75, 75)}):Play()
+        end)
+        btn.MouseButton1Down:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}):Play()
+        end)
+        btn.MouseButton1Up:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = color}):Play()
+        end)
+        
+        return btn
+    end
 
-    local ExecBtn = Instance.new("TextButton")
-    ExecBtn.Size = UDim2.new(0.48, 0, 0, 30)
-    ExecBtn.Position = UDim2.new(0, 0, 1, -30)
-    ExecBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    ExecBtn.BackgroundTransparency = 0.92
-    ExecBtn.Text = "Execute"
-    ExecBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ExecBtn.Font = Enum.Font.GothamMedium
-    ExecBtn.TextSize = 14
-    ExecBtn.Parent = ExecutorFrame
-    local uic2 = Instance.new("UICorner", ExecBtn)
-    uic2.CornerRadius = UDim.new(0, 6)
-    local stroke2 = Instance.new("UIStroke", ExecBtn)
-    stroke2.Color = Color3.fromRGB(255, 255, 255)
-    stroke2.Transparency = 0.9
+    local ExecBtn = createModernButton("Execute", UDim2.new(0, 0, 0, 0), Color3.fromRGB(14, 99, 156))
+    ExecBtn.Parent = Toolbar
     
-    local ClearBtn = Instance.new("TextButton")
-    ClearBtn.Size = UDim2.new(0.48, 0, 0, 30)
-    ClearBtn.Position = UDim2.new(0.52, 0, 1, -30)
-    ClearBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    ClearBtn.BackgroundTransparency = 0.92
-    ClearBtn.Text = "Clear"
-    ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ClearBtn.Font = Enum.Font.GothamMedium
-    ClearBtn.TextSize = 14
-    ClearBtn.Parent = ExecutorFrame
-    local uic3 = Instance.new("UICorner", ClearBtn)
-    uic3.CornerRadius = UDim.new(0, 6)
-    local stroke3 = Instance.new("UIStroke", ClearBtn)
-    stroke3.Color = Color3.fromRGB(255, 255, 255)
-    stroke3.Transparency = 0.9
-    
+    local ClearBtn = createModernButton("Clear", UDim2.new(0.52, 0, 0, 0), Color3.fromRGB(190, 50, 50))
+    ClearBtn.Parent = Toolbar
+
     ExecBtn.MouseButton1Click:Connect(function()
         local code = CodeBox.Text
         if code == "" or code == "-- Write Lua script here..." then return end
