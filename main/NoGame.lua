@@ -710,7 +710,7 @@ do
         Title = "Execute GokuDex",
         Description = "Custom Roblox explorer and instance viewer.",
         Callback = function()
-            loadstring(game:HttpGet("https://github.com/gokuthug1/GokuDex/raw/refs/heads/main/GokuDex.lua"))()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/gokuthug1/GokuDex/refs/heads/main/GokuDex.lua"))()
         end
     })
     Tabs.Universal:AddSection("Client Utilities")
