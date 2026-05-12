@@ -1122,82 +1122,211 @@ do
     PopOutBtn.MouseButton1Click:Connect(function()
         if not originalParent then originalParent = ExecutorFrame.Parent end
         
-        -- Create Standalone GUI
-        local targetGuiParent = (gethui and gethui()) or game:GetService("CoreGui")
+        -- Create Standalone GUI (Ensuring independence from hub)
+        local targetGuiParent = nil
+        pcall(function() targetGuiParent = game:GetService("CoreGui") end)
+        if not targetGuiParent then pcall(function() targetGuiParent = gethui() end) end
+        if not targetGuiParent then targetGuiParent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end
+
         customScreenGui = Instance.new("ScreenGui")
-        customScreenGui.Name = "ExecutorPopOut"
+        customScreenGui.Name = "XenoExecutorStandalone"
         customScreenGui.ResetOnSpawn = false
-        customScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        customScreenGui.DisplayOrder = 100
         customScreenGui.Parent = targetGuiParent
         
         local mainContainer = Instance.new("Frame")
         mainContainer.Size = UDim2.new(0, 600, 0, 400)
         mainContainer.Position = UDim2.new(0.5, -300, 0.5, -200)
-        mainContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        mainContainer.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
         mainContainer.BorderSizePixel = 0
         mainContainer.Parent = customScreenGui
         
         local corner = Instance.new("UICorner", mainContainer)
-        corner.CornerRadius = UDim.new(0, 8)
+        corner.CornerRadius = UDim.new(0, 6)
         local stroke = Instance.new("UIStroke", mainContainer)
-        stroke.Color = Color3.fromRGB(60, 60, 60)
+        stroke.Color = Color3.fromRGB(40, 40, 40)
+        stroke.Thickness = 1
         
-        local Topbar = Instance.new("Frame")
-        Topbar.Size = UDim2.new(1, 0, 0, 30)
-        Topbar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        Topbar.BorderSizePixel = 0
-        Topbar.Parent = mainContainer
-        local topCorner = Instance.new("UICorner", Topbar)
-        topCorner.CornerRadius = UDim.new(0, 8)
+        -- Xeno Header
+        local Header = Instance.new("Frame")
+        Header.Size = UDim2.new(1, 0, 0, 30)
+        Header.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        Header.BorderSizePixel = 0
+        Header.Parent = mainContainer
+        local hCorner = Instance.new("UICorner", Header)
+        hCorner.CornerRadius = UDim.new(0, 6)
         
-        local TopbarFix = Instance.new("Frame")
-        TopbarFix.Size = UDim2.new(1, 0, 0, 10)
-        TopbarFix.Position = UDim2.new(0, 0, 1, -10)
-        TopbarFix.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        TopbarFix.BorderSizePixel = 0
-        TopbarFix.Parent = Topbar
+        local TitleIcon = Instance.new("ImageLabel")
+        TitleIcon.Size = UDim2.new(0, 18, 0, 18)
+        TitleIcon.Position = UDim2.new(0, 10, 0, 6)
+        TitleIcon.BackgroundTransparency = 1
+        TitleIcon.Image = "rbxassetid://6031094678"
+        TitleIcon.Parent = Header
         
         local Title = Instance.new("TextLabel")
-        Title.Size = UDim2.new(1, -100, 1, 0)
-        Title.Position = UDim2.new(0, 15, 0, 0)
+        Title.Size = UDim2.new(1, -150, 1, 0)
+        Title.Position = UDim2.new(0, 35, 0, 0)
         Title.BackgroundTransparency = 1
-        Title.Text = "Executor (Standalone)"
-        Title.TextColor3 = Color3.fromRGB(200, 200, 200)
+        Title.Text = "Xeno <font color='#3498db'>v1.3.40</font> <font color='#555'>https://xeno.now</font>"
+        Title.RichText = true
+        Title.TextColor3 = Color3.fromRGB(255, 255, 255)
         Title.Font = Enum.Font.GothamMedium
-        Title.TextSize = 13
+        Title.TextSize = 12
         Title.TextXAlignment = Enum.TextXAlignment.Left
-        Title.Parent = Topbar
+        Title.Parent = Header
         
-        local DockBtn = Instance.new("TextButton")
-        DockBtn.Size = UDim2.new(0, 80, 0, 20)
-        DockBtn.Position = UDim2.new(1, -90, 0, 5)
-        DockBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-        DockBtn.Text = "Dock"
-        DockBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        DockBtn.Font = Enum.Font.GothamMedium
-        DockBtn.TextSize = 12
-        DockBtn.Parent = Topbar
-        local dockCorner = Instance.new("UICorner", DockBtn)
-        dockCorner.CornerRadius = UDim.new(0, 4)
+        local WindowControls = Instance.new("Frame")
+        WindowControls.Size = UDim2.new(0, 90, 1, 0)
+        WindowControls.Position = UDim2.new(1, -95, 0, 0)
+        WindowControls.BackgroundTransparency = 1
+        WindowControls.Parent = Header
         
-        DockBtn.MouseButton1Click:Connect(function()
-            if customScreenGui then
-                ExecutorFrame.Parent = originalParent
-                ExecutorFrame.Size = UDim2.new(1, -10, 0, 360)
-                ExecutorFrame.Position = UDim2.new(0, 0, 0, 0)
-                PopOutBtn.Visible = true
-                customScreenGui:Destroy()
-                customScreenGui = nil
-            end
+        local function createControlBtn(text, pos, color)
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 25, 0, 25)
+            btn.Position = pos
+            btn.BackgroundTransparency = 1
+            btn.Text = text
+            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 14
+            btn.Parent = WindowControls
+            btn.MouseEnter:Connect(function() btn.TextColor3 = color end)
+            btn.MouseLeave:Connect(function() btn.TextColor3 = Color3.fromRGB(200, 200, 200) end)
+            return btn
+        end
+        
+        local CloseBtn = createControlBtn("\226\156\149", UDim2.new(1, -30, 0, 2), Color3.fromRGB(255, 100, 100))
+        local MaxBtn = createControlBtn("\226\150\162", UDim2.new(1, -55, 0, 2), Color3.fromRGB(255, 255, 255))
+        local MinBtn = createControlBtn("\226\128\148", UDim2.new(1, -80, 0, 2), Color3.fromRGB(255, 255, 255))
+        
+        CloseBtn.MouseButton1Click:Connect(function()
+            ExecutorFrame.Parent = originalParent
+            ExecutorFrame.Size = UDim2.new(1, -10, 0, 360)
+            ExecutorFrame.Position = UDim2.new(0, 0, 0, 0)
+            PopOutBtn.Visible = true
+            customScreenGui:Destroy()
+            customScreenGui = nil
         end)
         
-        makeDraggable(Topbar, mainContainer)
+        -- Tab Bar
+        local TabBar = Instance.new("Frame")
+        TabBar.Size = UDim2.new(1, -20, 0, 25)
+        TabBar.Position = UDim2.new(0, 10, 0, 35)
+        TabBar.BackgroundTransparency = 1
+        TabBar.Parent = mainContainer
         
-        -- Migrate ExecutorFrame
+        local TabList = Instance.new("Frame")
+        TabList.Size = UDim2.new(1, -30, 1, 0)
+        TabList.BackgroundTransparency = 1
+        TabList.Parent = TabBar
+        local tabLayout = Instance.new("UIListLayout", TabList)
+        tabLayout.FillDirection = Enum.FillDirection.Horizontal
+        tabLayout.Padding = UDim.new(0, 5)
+        
+        local executorTabs = {{name = "Hub", content = CodeBox.Text}}
+        local activeTabIndex = 1
+
+        local function renderTabs()
+            for _, child in ipairs(TabList:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
+            for i, tData in ipairs(executorTabs) do
+                local tab = Instance.new("TextButton")
+                tab.Size = UDim2.new(0, 70, 1, 0)
+                tab.BackgroundColor3 = (i == activeTabIndex) and Color3.fromRGB(25, 25, 25) or Color3.fromRGB(15, 15, 15)
+                tab.Text = tData.name
+                tab.TextColor3 = (i == activeTabIndex) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+                tab.Font = Enum.Font.GothamMedium
+                tab.TextSize = 11
+                tab.Parent = TabList
+                Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 4)
+                
+                tab.MouseButton1Click:Connect(function()
+                    executorTabs[activeTabIndex].content = CodeBox.Text
+                    activeTabIndex = i
+                    renderTabs()
+                    CodeBox.Text = executorTabs[activeTabIndex].content
+                end)
+            end
+        end
+        renderTabs()
+        
+        local AddTab = Instance.new("TextButton")
+        AddTab.Size = UDim2.new(0, 20, 0, 20)
+        AddTab.Position = UDim2.new(1, -20, 0, 2)
+        AddTab.BackgroundTransparency = 1
+        AddTab.Text = "+"
+        AddTab.TextColor3 = Color3.fromRGB(200, 200, 200)
+        AddTab.Font = Enum.Font.GothamBold
+        AddTab.TextSize = 16
+        AddTab.Parent = TabBar
+        
+        AddTab.MouseButton1Click:Connect(function()
+            table.insert(executorTabs, {name = "Tab " .. (#executorTabs + 1), content = "-- New Script"})
+            activeTabIndex = #executorTabs
+            renderTabs()
+            CodeBox.Text = executorTabs[activeTabIndex].content
+        end)
+
+        -- Adjust ExecutorFrame placement
         ExecutorFrame.Parent = mainContainer
-        ExecutorFrame.Size = UDim2.new(1, -20, 1, -40)
-        ExecutorFrame.Position = UDim2.new(0, 10, 0, 35)
+        ExecutorFrame.Size = UDim2.new(1, -20, 1, -110)
+        ExecutorFrame.Position = UDim2.new(0, 10, 0, 65)
         PopOutBtn.Visible = false
+        
+        -- Icon Footer
+        local Footer = Instance.new("Frame")
+        Footer.Size = UDim2.new(1, -20, 0, 30)
+        Footer.Position = UDim2.new(0, 10, 1, -35)
+        Footer.BackgroundTransparency = 1
+        Footer.Parent = mainContainer
+        
+        local LeftIcons = Instance.new("Frame")
+        LeftIcons.Size = UDim2.new(0.5, 0, 1, 0)
+        LeftIcons.BackgroundTransparency = 1
+        LeftIcons.Parent = Footer
+        local liLayout = Instance.new("UIListLayout", LeftIcons)
+        liLayout.FillDirection = Enum.FillDirection.Horizontal
+        liLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        liLayout.Padding = UDim.new(0, 15)
+        
+        local RightIcons = Instance.new("Frame")
+        RightIcons.Size = UDim2.new(0.5, 0, 1, 0)
+        RightIcons.Position = UDim2.new(0.5, 0, 0, 0)
+        RightIcons.BackgroundTransparency = 1
+        RightIcons.Parent = Footer
+        local riLayout = Instance.new("UIListLayout", RightIcons)
+        riLayout.FillDirection = Enum.FillDirection.Horizontal
+        riLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+        riLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        riLayout.Padding = UDim.new(0, 15)
+        
+        local function createIconBtn(iconId, parent, callback)
+            local btn = Instance.new("ImageButton")
+            btn.Size = UDim2.new(0, 20, 0, 20)
+            btn.BackgroundTransparency = 1
+            btn.Image = iconId
+            btn.ImageColor3 = Color3.fromRGB(180, 180, 180)
+            btn.Parent = parent
+            btn.MouseEnter:Connect(function() btn.ImageColor3 = Color3.fromRGB(255, 255, 255) end)
+            btn.MouseLeave:Connect(function() btn.ImageColor3 = Color3.fromRGB(180, 180, 180) end)
+            btn.MouseButton1Click:Connect(callback)
+            return btn
+        end
+        
+        createIconBtn("rbxassetid://6031289132", LeftIcons, function() end)
+        createIconBtn("rbxassetid://6034822744", LeftIcons, function() end)
+        createIconBtn("rbxassetid://6023426926", LeftIcons, function() end)
+        createIconBtn("rbxassetid://6034484500", LeftIcons, function() CodeBox.Text = "" end)
+        
+        createIconBtn("rbxassetid://6034840432", RightIcons, function() end)
+        createIconBtn("rbxassetid://6031091000", RightIcons, function() end)
+        createIconBtn("rbxassetid://6031243717", RightIcons, function() end)
+        createIconBtn("rbxassetid://6031225818", RightIcons, function() 
+            local fn, err = loadstring(CodeBox.Text)
+            if fn then pcall(fn) else warn(err) end
+        end)
+        
+        makeDraggable(Header, mainContainer)
     end)
 
     -- Inject into Fluent UI tab
