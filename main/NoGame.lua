@@ -1023,9 +1023,9 @@ do
     Toolbar.BackgroundTransparency = 1
     Toolbar.Parent = ExecutorFrame
     
-    local function createModernButton(text, pos, color)
+    local function createModernButton(text, pos, size, color)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.48, 0, 1, 0)
+        btn.Size = size
         btn.Position = pos
         btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
         btn.Text = "  " .. text
@@ -1058,11 +1058,14 @@ do
         return btn
     end
 
-    local ExecBtn = createModernButton("Execute", UDim2.new(0, 0, 0, 0), Color3.fromRGB(14, 99, 156))
+    local ExecBtn = createModernButton("Execute", UDim2.new(0, 0, 0, 0), UDim2.new(0.32, 0, 1, 0), Color3.fromRGB(14, 99, 156))
     ExecBtn.Parent = Toolbar
     
-    local ClearBtn = createModernButton("Clear", UDim2.new(0.52, 0, 0, 0), Color3.fromRGB(190, 50, 50))
+    local ClearBtn = createModernButton("Clear", UDim2.new(0.34, 0, 0, 0), UDim2.new(0.32, 0, 1, 0), Color3.fromRGB(190, 50, 50))
     ClearBtn.Parent = Toolbar
+
+    local PopOutBtn = createModernButton("Pop Out", UDim2.new(0.68, 0, 0, 0), UDim2.new(0.32, 0, 1, 0), Color3.fromRGB(210, 140, 30))
+    PopOutBtn.Parent = Toolbar
 
     ExecBtn.MouseButton1Click:Connect(function()
         local code = CodeBox.Text
@@ -1080,6 +1083,123 @@ do
         CodeBox.Text = ""
     end)
 
+    -- Pop Out Logic
+    local originalParent = nil
+    local customScreenGui = nil
+
+    local function makeDraggable(topbar, object)
+        local dragging = false
+        local dragInput, mousePos, framePos
+
+        topbar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                mousePos = input.Position
+                framePos = object.Position
+                
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+
+        topbar.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - mousePos
+                object.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+            end
+        end)
+    end
+
+    PopOutBtn.MouseButton1Click:Connect(function()
+        if not originalParent then originalParent = ExecutorFrame.Parent end
+        
+        -- Create Standalone GUI
+        local targetGuiParent = (gethui and gethui()) or game:GetService("CoreGui")
+        customScreenGui = Instance.new("ScreenGui")
+        customScreenGui.Name = "ExecutorPopOut"
+        customScreenGui.ResetOnSpawn = false
+        customScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        customScreenGui.Parent = targetGuiParent
+        
+        local mainContainer = Instance.new("Frame")
+        mainContainer.Size = UDim2.new(0, 600, 0, 400)
+        mainContainer.Position = UDim2.new(0.5, -300, 0.5, -200)
+        mainContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        mainContainer.BorderSizePixel = 0
+        mainContainer.Parent = customScreenGui
+        
+        local corner = Instance.new("UICorner", mainContainer)
+        corner.CornerRadius = UDim.new(0, 8)
+        local stroke = Instance.new("UIStroke", mainContainer)
+        stroke.Color = Color3.fromRGB(60, 60, 60)
+        
+        local Topbar = Instance.new("Frame")
+        Topbar.Size = UDim2.new(1, 0, 0, 30)
+        Topbar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        Topbar.BorderSizePixel = 0
+        Topbar.Parent = mainContainer
+        local topCorner = Instance.new("UICorner", Topbar)
+        topCorner.CornerRadius = UDim.new(0, 8)
+        
+        local TopbarFix = Instance.new("Frame")
+        TopbarFix.Size = UDim2.new(1, 0, 0, 10)
+        TopbarFix.Position = UDim2.new(0, 0, 1, -10)
+        TopbarFix.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        TopbarFix.BorderSizePixel = 0
+        TopbarFix.Parent = Topbar
+        
+        local Title = Instance.new("TextLabel")
+        Title.Size = UDim2.new(1, -100, 1, 0)
+        Title.Position = UDim2.new(0, 15, 0, 0)
+        Title.BackgroundTransparency = 1
+        Title.Text = "Executor (Standalone)"
+        Title.TextColor3 = Color3.fromRGB(200, 200, 200)
+        Title.Font = Enum.Font.GothamMedium
+        Title.TextSize = 13
+        Title.TextXAlignment = Enum.TextXAlignment.Left
+        Title.Parent = Topbar
+        
+        local DockBtn = Instance.new("TextButton")
+        DockBtn.Size = UDim2.new(0, 80, 0, 20)
+        DockBtn.Position = UDim2.new(1, -90, 0, 5)
+        DockBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        DockBtn.Text = "Dock"
+        DockBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        DockBtn.Font = Enum.Font.GothamMedium
+        DockBtn.TextSize = 12
+        DockBtn.Parent = Topbar
+        local dockCorner = Instance.new("UICorner", DockBtn)
+        dockCorner.CornerRadius = UDim.new(0, 4)
+        
+        DockBtn.MouseButton1Click:Connect(function()
+            if customScreenGui then
+                ExecutorFrame.Parent = originalParent
+                ExecutorFrame.Size = UDim2.new(1, -10, 0, 360)
+                ExecutorFrame.Position = UDim2.new(0, 0, 0, 0)
+                PopOutBtn.Visible = true
+                customScreenGui:Destroy()
+                customScreenGui = nil
+            end
+        end)
+        
+        makeDraggable(Topbar, mainContainer)
+        
+        -- Migrate ExecutorFrame
+        ExecutorFrame.Parent = mainContainer
+        ExecutorFrame.Size = UDim2.new(1, -20, 1, -40)
+        ExecutorFrame.Position = UDim2.new(0, 10, 0, 35)
+        PopOutBtn.Visible = false
+    end)
+
     -- Inject into Fluent UI tab
     local tempPara = Tabs.Executor:AddParagraph({ Title = "Loading Executor...", Content = "" })
     task.spawn(function()
@@ -1088,10 +1208,12 @@ do
             local uiParent = tempPara.Frame and tempPara.Frame.Parent
             if uiParent then
                 ExecutorFrame.Parent = uiParent
+                originalParent = uiParent
                 tempPara.Frame:Destroy()
             else
                 if type(Tabs.Executor) == "table" and Tabs.Executor.Container then
                     ExecutorFrame.Parent = Tabs.Executor.Container
+                    originalParent = Tabs.Executor.Container
                 end
             end
         end)
