@@ -840,13 +840,15 @@ do
         end
     })
 
-    local function addEvent(id, name, evData)
+    local function addEvent(id, displayName, evData)
+        evData.displayName = displayName
         if not getgenv().GokuListener.Events[id] then
             getgenv().GokuListener.Events[id] = evData
+            getgenv().GokuListener.Events[displayName] = evData -- allow lookup by display name too
             if getgenv().GokuListener.EventNames[1] == "None" then table.remove(getgenv().GokuListener.EventNames, 1) end
-            table.insert(getgenv().GokuListener.EventNames, id)
+            table.insert(getgenv().GokuListener.EventNames, displayName)
             EventDropdown:SetValues(getgenv().GokuListener.EventNames)
-            EventDropdown:SetValue(id)
+            EventDropdown:SetValue(displayName)
         else
             getgenv().GokuListener.Events[id].count = (getgenv().GokuListener.Events[id].count or 1) + 1
             if evData.args then getgenv().GokuListener.Events[id].args = evData.args end
@@ -862,31 +864,40 @@ do
                 return MarketplaceService:GetProductInfo(id, infoType)
             end)
             local name = defaultName
-            if success and type(info) == "table" and info.Name then
-                name = info.Name
+            local price = nil
+            if success and type(info) == "table" then
+                if info.Name then
+                    name = info.Name
+                end
+                if info.PriceInRobux then
+                    price = info.PriceInRobux
+                end
             end
-            callback(name)
+            callback(name, price)
         end)
     end
 
     MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, id, isPurchased)
         if getgenv().GokuListener.ListenMarket and userId == Players.LocalPlayer.UserId then 
-            fetchMarketplaceName(id, Enum.InfoType.Product, "Product: " .. id, function(name)
-                addEvent("Product_"..id, "Product: "..name, {type = "Product", id = id, count = 1})
+            fetchMarketplaceName(id, Enum.InfoType.Product, "Product: " .. id, function(name, price)
+                local display = name .. (price and (" (R$" .. price .. ")") or "")
+                addEvent("Product_"..id, display, {type = "Product", id = id, count = 1})
             end)
         end
     end)
     MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, id, isPurchased)
         if getgenv().GokuListener.ListenMarket and player == Players.LocalPlayer then 
-            fetchMarketplaceName(id, Enum.InfoType.GamePass, "Gamepass: " .. id, function(name)
-                addEvent("Gamepass_"..id, "Gamepass: "..name, {type = "Gamepass", id = id, count = 1})
+            fetchMarketplaceName(id, Enum.InfoType.GamePass, "Gamepass: " .. id, function(name, price)
+                local display = name .. (price and (" (R$" .. price .. ")") or "")
+                addEvent("Gamepass_"..id, display, {type = "Gamepass", id = id, count = 1})
             end)
         end
     end)
     MarketplaceService.PromptPurchaseFinished:Connect(function(player, id, isPurchased)
         if getgenv().GokuListener.ListenMarket and player == Players.LocalPlayer then 
-            fetchMarketplaceName(id, Enum.InfoType.Asset, "Purchase: " .. id, function(name)
-                addEvent("Purchase_"..id, "Purchase: "..name, {type = "Purchase", id = id, count = 1})
+            fetchMarketplaceName(id, Enum.InfoType.Asset, "Purchase: " .. id, function(name, price)
+                local display = name .. (price and (" (R$" .. price .. ")") or "")
+                addEvent("Purchase_"..id, display, {type = "Purchase", id = id, count = 1})
             end)
         end
     end)
@@ -1711,6 +1722,274 @@ do
             end
             print("Parts:    " .. #char:GetChildren() .. " children")
             print("===========================")
+        end
+    })
+
+    -- =====================================
+    -- UI: DEBUGGER DUMP ALL
+    -- =====================================
+    Tabs.Debugger:AddSection("Dump All")
+
+    local DumpFormatDropdown = Tabs.Debugger:AddDropdown("DumpFormat_DD", {
+        Title = "Output Format",
+        Values = {".json", ".txt", ".lua"},
+        Multi = false,
+        Default = 1,
+    })
+
+    Tabs.Debugger:AddButton({
+        Title = "Dump All to File",
+        Description = "Dumps all debugger info to a file named 'all'. May freeze briefly.",
+        Callback = function()
+            local format = Options.DumpFormat_DD.Value or ".json"
+
+            -- Collect all data
+            local data = {}
+
+            -- Player Info
+            local lp = Players.LocalPlayer
+            data.PlayerInfo = {
+                Name = tostring(lp.Name),
+                DisplayName = tostring(lp.DisplayName),
+                UserId = lp.UserId,
+                AccountAge = lp.AccountAge,
+                Premium = (lp.MembershipType == Enum.MembershipType.Premium),
+                Team = tostring(lp.Team),
+            }
+            pcall(function()
+                local char = lp.Character
+                if char then
+                    data.PlayerInfo.Character = tostring(char)
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        data.PlayerInfo.Health = hum.Health
+                        data.PlayerInfo.MaxHealth = hum.MaxHealth
+                        data.PlayerInfo.WalkSpeed = hum.WalkSpeed
+                        data.PlayerInfo.JumpPower = hum.JumpPower
+                        data.PlayerInfo.HumanoidState = tostring(hum:GetState())
+                    end
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        data.PlayerInfo.Position = tostring(root.Position)
+                        data.PlayerInfo.CFrame = tostring(root.CFrame)
+                        data.PlayerInfo.Velocity = tostring(root.AssemblyLinearVelocity)
+                    end
+                end
+            end)
+
+            -- Game Info
+            data.GameInfo = {
+                PlaceId = game.PlaceId,
+                JobId = game.JobId,
+                PlaceVersion = game.PlaceVersion,
+                PlayerCount = #Players:GetPlayers(),
+                ServerTime = workspace.DistributedGameTime,
+            }
+            pcall(function()
+                local info = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+                data.GameInfo.GameName = tostring(info.Name)
+                data.GameInfo.Creator = tostring(info.Creator and info.Creator.Name)
+            end)
+
+            -- Executor Info
+            data.ExecutorInfo = {}
+            pcall(function() data.ExecutorInfo.request = (request ~= nil) end)
+            pcall(function() data.ExecutorInfo.http_request = (http_request ~= nil) end)
+            pcall(function() data.ExecutorInfo.syn_request = (syn ~= nil and syn.request ~= nil) end)
+            pcall(function() data.ExecutorInfo.getrawmetatable = (getrawmetatable ~= nil) end)
+            pcall(function() data.ExecutorInfo.setreadonly = (setreadonly ~= nil) end)
+            pcall(function() data.ExecutorInfo.getnamecallmethod = (getnamecallmethod ~= nil) end)
+            pcall(function() data.ExecutorInfo.hookfunction = (hookfunction ~= nil) end)
+            pcall(function() data.ExecutorInfo.decompile = (decompile ~= nil) end)
+            pcall(function() data.ExecutorInfo.getgc = (getgc ~= nil) end)
+            pcall(function() data.ExecutorInfo.getscripts = (getscripts ~= nil) end)
+            pcall(function() data.ExecutorInfo.getsenv = (getsenv ~= nil) end)
+
+            -- RemoteEvents
+            data.RemoteEvents = {}
+            pcall(function()
+                for _, obj in ipairs(game:GetDescendants()) do
+                    if obj:IsA("RemoteEvent") then
+                        table.insert(data.RemoteEvents, obj:GetFullName())
+                    end
+                end
+            end)
+
+            -- RemoteFunctions
+            data.RemoteFunctions = {}
+            pcall(function()
+                for _, obj in ipairs(game:GetDescendants()) do
+                    if obj:IsA("RemoteFunction") then
+                        table.insert(data.RemoteFunctions, obj:GetFullName())
+                    end
+                end
+            end)
+
+            -- BindableEvents
+            data.BindableEvents = {}
+            pcall(function()
+                for _, obj in ipairs(game:GetDescendants()) do
+                    if obj:IsA("BindableEvent") then
+                        table.insert(data.BindableEvents, obj:GetFullName())
+                    end
+                end
+            end)
+
+            -- LocalScripts
+            data.LocalScripts = {}
+            pcall(function()
+                for _, obj in ipairs(game:GetDescendants()) do
+                    if obj:IsA("LocalScript") then
+                        table.insert(data.LocalScripts, {
+                            FullName = obj:GetFullName(),
+                            Disabled = obj.Disabled
+                        })
+                    end
+                end
+            end)
+
+            -- ModuleScripts
+            data.ModuleScripts = {}
+            pcall(function()
+                for _, obj in ipairs(game:GetDescendants()) do
+                    if obj:IsA("ModuleScript") then
+                        table.insert(data.ModuleScripts, obj:GetFullName())
+                    end
+                end
+            end)
+
+            -- Running Scripts
+            data.RunningScripts = {}
+            pcall(function()
+                if getscripts then
+                    for _, s in ipairs(getscripts()) do
+                        table.insert(data.RunningScripts, {
+                            Name = tostring(s.Name),
+                            FullName = tostring(s:GetFullName())
+                        })
+                    end
+                end
+            end)
+
+            -- Memory Stats
+            data.Performance = {}
+            pcall(function() data.Performance.LuaMemoryMB = collectgarbage("count") / 1024 end)
+            pcall(function()
+                local stats = game:GetService("Stats")
+                data.Performance.DataReceiveKbps = stats.DataReceiveKbps
+                data.Performance.DataSendKbps = stats.DataSendKbps
+            end)
+
+            -- Serialize based on format
+            local output = ""
+            local fileName = "all"
+
+            if format == ".json" then
+                fileName = "all.json"
+                local ok, encoded = pcall(function()
+                    return HttpService:JSONEncode(data)
+                end)
+                output = ok and encoded or "Failed to encode JSON"
+
+            elseif format == ".txt" then
+                fileName = "all.txt"
+                local lines = {}
+                local function dumpValue(key, val, indent)
+                    indent = indent or ""
+                    if type(val) == "table" then
+                        table.insert(lines, indent .. tostring(key) .. ":")
+                        for k, v in pairs(val) do
+                            dumpValue(k, v, indent .. "  ")
+                        end
+                    else
+                        table.insert(lines, indent .. tostring(key) .. ": " .. tostring(val))
+                    end
+                end
+                table.insert(lines, "===== FULL DEBUG DUMP =====")
+                table.insert(lines, "Timestamp: " .. os.date("%Y-%m-%d %H:%M:%S"))
+                table.insert(lines, "")
+                for section, sectionData in pairs(data) do
+                    dumpValue(section, sectionData)
+                    table.insert(lines, "")
+                end
+                output = table.concat(lines, "\n")
+
+            elseif format == ".lua" then
+                fileName = "all.lua"
+                local lines = {}
+                local function luaSerialize(val, indent)
+                    indent = indent or ""
+                    if type(val) == "table" then
+                        local isArray = true
+                        local maxN = 0
+                        for k, _ in pairs(val) do
+                            if type(k) == "number" and k > 0 and math.floor(k) == k then
+                                if k > maxN then maxN = k end
+                            else
+                                isArray = false
+                                break
+                            end
+                        end
+                        if isArray and maxN == #val then
+                            -- array-style
+                            table.insert(lines, "{")
+                            for i, v in ipairs(val) do
+                                table.insert(lines, indent .. "  ")
+                                luaSerialize(v, indent .. "  ")
+                                table.insert(lines, ",")
+                            end
+                            table.insert(lines, indent .. "}")
+                        else
+                            -- dict-style
+                            table.insert(lines, "{")
+                            for k, v in pairs(val) do
+                                local keyStr = type(k) == "string" and ('["' .. k .. '"]') or ("[" .. tostring(k) .. "]")
+                                table.insert(lines, indent .. "  " .. keyStr .. " = ")
+                                luaSerialize(v, indent .. "  ")
+                                table.insert(lines, ",")
+                            end
+                            table.insert(lines, indent .. "}")
+                        end
+                    elseif type(val) == "string" then
+                        table.insert(lines, '"' .. val:gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n') .. '"')
+                    elseif type(val) == "boolean" then
+                        table.insert(lines, tostring(val))
+                    elseif type(val) == "number" then
+                        table.insert(lines, tostring(val))
+                    else
+                        table.insert(lines, '"' .. tostring(val) .. '"')
+                    end
+                end
+                table.insert(lines, "-- Full Debug Dump")
+                table.insert(lines, "-- Generated: " .. os.date("%Y-%m-%d %H:%M:%S"))
+                table.insert(lines, "")
+                table.insert(lines, "local data = ")
+                luaSerialize(data, "")
+                table.insert(lines, "")
+                table.insert(lines, "return data")
+                output = table.concat(lines)
+            end
+
+            -- Write file
+            local writeOk, writeErr = pcall(function()
+                writefile(fileName, output)
+            end)
+
+            if writeOk then
+                Fluent:Notify({
+                    Title = "Dump Complete",
+                    Content = "Saved as '" .. fileName .. "' in workspace folder.",
+                    Duration = 5
+                })
+                print("[Debugger] Dump saved to: " .. fileName)
+            else
+                Fluent:Notify({
+                    Title = "Dump Failed",
+                    Content = "writefile error: " .. tostring(writeErr),
+                    Duration = 5
+                })
+                print("[Debugger] Dump failed: " .. tostring(writeErr))
+            end
         end
     })
 
