@@ -1,10 +1,10 @@
 if getgenv().Window then
     pcall(function()
-        if getgenv()._FluentLib then
-            getgenv()._FluentLib:Destroy()
-        end
+        getgenv().Window:Destroy()
     end)
     getgenv().Window = nil
+end
+if getgenv()._FluentLib then
     getgenv()._FluentLib = nil
 end
 
@@ -855,21 +855,42 @@ do
 
     -- Hook Marketplace
     local MarketplaceService = game:GetService("MarketplaceService")
+
+    local function fetchMarketplaceName(id, infoType, defaultName, callback)
+        task.spawn(function()
+            local success, info = pcall(function()
+                return MarketplaceService:GetProductInfo(id, infoType)
+            end)
+            local name = defaultName
+            if success and type(info) == "table" and info.Name then
+                name = info.Name
+            end
+            callback(name)
+        end)
+    end
+
     MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, id, isPurchased)
         if getgenv().GokuListener.ListenMarket and userId == Players.LocalPlayer.UserId then 
-            addEvent("Product_"..id, "Product: "..id, {type = "Product", id = id, count = 1})
+            fetchMarketplaceName(id, Enum.InfoType.Product, "Product: " .. id, function(name)
+                addEvent("Product_"..id, "Product: "..name, {type = "Product", id = id, count = 1})
+            end)
         end
     end)
     MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, id, isPurchased)
         if getgenv().GokuListener.ListenMarket and player == Players.LocalPlayer then 
-            addEvent("Gamepass_"..id, "Gamepass: "..id, {type = "Gamepass", id = id, count = 1})
+            fetchMarketplaceName(id, Enum.InfoType.GamePass, "Gamepass: " .. id, function(name)
+                addEvent("Gamepass_"..id, "Gamepass: "..name, {type = "Gamepass", id = id, count = 1})
+            end)
         end
     end)
     MarketplaceService.PromptPurchaseFinished:Connect(function(player, id, isPurchased)
         if getgenv().GokuListener.ListenMarket and player == Players.LocalPlayer then 
-            addEvent("Purchase_"..id, "Purchase: "..id, {type = "Purchase", id = id, count = 1})
+            fetchMarketplaceName(id, Enum.InfoType.Asset, "Purchase: " .. id, function(name)
+                addEvent("Purchase_"..id, "Purchase: "..name, {type = "Purchase", id = id, count = 1})
+            end)
         end
     end)
+
 
     -- Hook Network
     local function involvesLocalPlayer(args)
@@ -892,7 +913,7 @@ do
 
     if hookmetamethod then
         local oldNamecall
-        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local function hook(self, ...)
             if not checkcaller() then
                 local method = getnamecallmethod()
                 local args = {...}
@@ -913,8 +934,18 @@ do
                 end
             end
             return oldNamecall(self, ...)
+        end
+
+        local ok = pcall(function()
+            oldNamecall = hookmetamethod(game, "__namecall", hook)
         end)
+        if not ok then
+            pcall(function()
+                oldNamecall = hookmetamethod("__namecall", hook)
+            end)
+        end
     end
+
 
     -- =====================================
     -- UI: EXECUTOR TAB

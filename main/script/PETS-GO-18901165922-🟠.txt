@@ -941,24 +941,35 @@ function startInput_ChestLoop()
     end)
 end
 
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    
-    if method == "InvokeServer" and tostring(self) == "Consumables_Consume" then
-        if args[1] then
-            getgenv().lastBait = args[1]  
+if hookmetamethod then
+    local function hook(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        
+        if method == "InvokeServer" and tostring(self) == "Consumables_Consume" then
+            if args[1] then
+                getgenv().lastBait = args[1]  
+            end
         end
+
+        if method == "InvokeServer" and tostring(self) == "Lootbox: Open" then
+            if args[1] then
+                getgenv().lastChest = args[1] 
+            end
+        end
+        
+        return oldNamecall(self, ...)
     end
 
-    if method == "InvokeServer" and tostring(self) == "Lootbox: Open" then
-        if args[1] then
-            getgenv().lastChest = args[1] 
-        end
+    local ok = pcall(function()
+        oldNamecall = hookmetamethod(game, "__namecall", hook)
+    end)
+    if not ok then
+        pcall(function()
+            oldNamecall = hookmetamethod("__namecall", hook)
+        end)
     end
-    
-    return oldNamecall(self, ...)
-end)
+end
 
 
     Tabs.Gameworks:AddSection("Pets Equip")

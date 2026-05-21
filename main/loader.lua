@@ -1,9 +1,11 @@
-if getgenv()._FluentLib then
+if getgenv().Window then
     pcall(function()
-        getgenv()._FluentLib:Destroy()
+        getgenv().Window:Destroy()
     end)
-    getgenv()._FluentLib = nil
     getgenv().Window = nil
+end
+if getgenv()._FluentLib then
+    getgenv()._FluentLib = nil
 end
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
