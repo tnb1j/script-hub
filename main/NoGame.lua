@@ -1738,258 +1738,525 @@ do
     })
 
     Tabs.Debugger:AddButton({
-        Title = "Dump All to File",
-        Description = "Dumps all debugger info to a file named 'all'. May freeze briefly.",
+        Title = "Dump All to Folder",
+        Description = "Creates an organized folder tree with all debug data. May freeze the game briefly.",
         Callback = function()
             local format = Options.DumpFormat_DD.Value or ".json"
+            local ext = format -- ".json", ".txt", or ".lua"
 
-            -- Collect all data
-            local data = {}
+            -- Utility: sanitize a name for use as a file/folder name
+            local function sanitize(name)
+                local s = tostring(name)
+                s = s:gsub("[\\/:*?\"<>|]", "_")
+                s = s:gsub("%.%.", "_")
+                if #s > 200 then s = s:sub(1, 200) end
+                if s == "" then s = "_unnamed" end
+                return s
+            end
 
-            -- Player Info
-            local lp = Players.LocalPlayer
-            data.PlayerInfo = {
-                Name = tostring(lp.Name),
-                DisplayName = tostring(lp.DisplayName),
-                UserId = lp.UserId,
-                AccountAge = lp.AccountAge,
-                Premium = (lp.MembershipType == Enum.MembershipType.Premium),
-                Team = tostring(lp.Team),
-            }
-            pcall(function()
-                local char = lp.Character
-                if char then
-                    data.PlayerInfo.Character = tostring(char)
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        data.PlayerInfo.Health = hum.Health
-                        data.PlayerInfo.MaxHealth = hum.MaxHealth
-                        data.PlayerInfo.WalkSpeed = hum.WalkSpeed
-                        data.PlayerInfo.JumpPower = hum.JumpPower
-                        data.PlayerInfo.HumanoidState = tostring(hum:GetState())
-                    end
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        data.PlayerInfo.Position = tostring(root.Position)
-                        data.PlayerInfo.CFrame = tostring(root.CFrame)
-                        data.PlayerInfo.Velocity = tostring(root.AssemblyLinearVelocity)
-                    end
-                end
-            end)
+            -- Utility: serialize a table to string in the chosen format
+            local function serialize(tbl)
+                if ext == ".json" then
+                    local ok, encoded = pcall(function()
+                        return HttpService:JSONEncode(tbl)
+                    end)
+                    return ok and encoded or "Failed to encode JSON"
 
-            -- Game Info
-            data.GameInfo = {
-                PlaceId = game.PlaceId,
-                JobId = game.JobId,
-                PlaceVersion = game.PlaceVersion,
-                PlayerCount = #Players:GetPlayers(),
-                ServerTime = workspace.DistributedGameTime,
-            }
-            pcall(function()
-                local info = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
-                data.GameInfo.GameName = tostring(info.Name)
-                data.GameInfo.Creator = tostring(info.Creator and info.Creator.Name)
-            end)
-
-            -- Executor Info
-            data.ExecutorInfo = {}
-            pcall(function() data.ExecutorInfo.request = (request ~= nil) end)
-            pcall(function() data.ExecutorInfo.http_request = (http_request ~= nil) end)
-            pcall(function() data.ExecutorInfo.syn_request = (syn ~= nil and syn.request ~= nil) end)
-            pcall(function() data.ExecutorInfo.getrawmetatable = (getrawmetatable ~= nil) end)
-            pcall(function() data.ExecutorInfo.setreadonly = (setreadonly ~= nil) end)
-            pcall(function() data.ExecutorInfo.getnamecallmethod = (getnamecallmethod ~= nil) end)
-            pcall(function() data.ExecutorInfo.hookfunction = (hookfunction ~= nil) end)
-            pcall(function() data.ExecutorInfo.decompile = (decompile ~= nil) end)
-            pcall(function() data.ExecutorInfo.getgc = (getgc ~= nil) end)
-            pcall(function() data.ExecutorInfo.getscripts = (getscripts ~= nil) end)
-            pcall(function() data.ExecutorInfo.getsenv = (getsenv ~= nil) end)
-
-            -- RemoteEvents
-            data.RemoteEvents = {}
-            pcall(function()
-                for _, obj in ipairs(game:GetDescendants()) do
-                    if obj:IsA("RemoteEvent") then
-                        table.insert(data.RemoteEvents, obj:GetFullName())
-                    end
-                end
-            end)
-
-            -- RemoteFunctions
-            data.RemoteFunctions = {}
-            pcall(function()
-                for _, obj in ipairs(game:GetDescendants()) do
-                    if obj:IsA("RemoteFunction") then
-                        table.insert(data.RemoteFunctions, obj:GetFullName())
-                    end
-                end
-            end)
-
-            -- BindableEvents
-            data.BindableEvents = {}
-            pcall(function()
-                for _, obj in ipairs(game:GetDescendants()) do
-                    if obj:IsA("BindableEvent") then
-                        table.insert(data.BindableEvents, obj:GetFullName())
-                    end
-                end
-            end)
-
-            -- LocalScripts
-            data.LocalScripts = {}
-            pcall(function()
-                for _, obj in ipairs(game:GetDescendants()) do
-                    if obj:IsA("LocalScript") then
-                        table.insert(data.LocalScripts, {
-                            FullName = obj:GetFullName(),
-                            Disabled = obj.Disabled
-                        })
-                    end
-                end
-            end)
-
-            -- ModuleScripts
-            data.ModuleScripts = {}
-            pcall(function()
-                for _, obj in ipairs(game:GetDescendants()) do
-                    if obj:IsA("ModuleScript") then
-                        table.insert(data.ModuleScripts, obj:GetFullName())
-                    end
-                end
-            end)
-
-            -- Running Scripts
-            data.RunningScripts = {}
-            pcall(function()
-                if getscripts then
-                    for _, s in ipairs(getscripts()) do
-                        table.insert(data.RunningScripts, {
-                            Name = tostring(s.Name),
-                            FullName = tostring(s:GetFullName())
-                        })
-                    end
-                end
-            end)
-
-            -- Memory Stats
-            data.Performance = {}
-            pcall(function() data.Performance.LuaMemoryMB = collectgarbage("count") / 1024 end)
-            pcall(function()
-                local stats = game:GetService("Stats")
-                data.Performance.DataReceiveKbps = stats.DataReceiveKbps
-                data.Performance.DataSendKbps = stats.DataSendKbps
-            end)
-
-            -- Serialize based on format
-            local output = ""
-            local fileName = "all"
-
-            if format == ".json" then
-                fileName = "all.json"
-                local ok, encoded = pcall(function()
-                    return HttpService:JSONEncode(data)
-                end)
-                output = ok and encoded or "Failed to encode JSON"
-
-            elseif format == ".txt" then
-                fileName = "all.txt"
-                local lines = {}
-                local function dumpValue(key, val, indent)
-                    indent = indent or ""
-                    if type(val) == "table" then
-                        table.insert(lines, indent .. tostring(key) .. ":")
-                        for k, v in pairs(val) do
-                            dumpValue(k, v, indent .. "  ")
-                        end
-                    else
-                        table.insert(lines, indent .. tostring(key) .. ": " .. tostring(val))
-                    end
-                end
-                table.insert(lines, "===== FULL DEBUG DUMP =====")
-                table.insert(lines, "Timestamp: " .. os.date("%Y-%m-%d %H:%M:%S"))
-                table.insert(lines, "")
-                for section, sectionData in pairs(data) do
-                    dumpValue(section, sectionData)
-                    table.insert(lines, "")
-                end
-                output = table.concat(lines, "\n")
-
-            elseif format == ".lua" then
-                fileName = "all.lua"
-                local lines = {}
-                local function luaSerialize(val, indent)
-                    indent = indent or ""
-                    if type(val) == "table" then
-                        local isArray = true
-                        local maxN = 0
-                        for k, _ in pairs(val) do
-                            if type(k) == "number" and k > 0 and math.floor(k) == k then
-                                if k > maxN then maxN = k end
-                            else
-                                isArray = false
-                                break
-                            end
-                        end
-                        if isArray and maxN == #val then
-                            -- array-style
-                            table.insert(lines, "{")
-                            for i, v in ipairs(val) do
-                                table.insert(lines, indent .. "  ")
-                                luaSerialize(v, indent .. "  ")
-                                table.insert(lines, ",")
-                            end
-                            table.insert(lines, indent .. "}")
-                        else
-                            -- dict-style
-                            table.insert(lines, "{")
+                elseif ext == ".txt" then
+                    local lines = {}
+                    local function dumpValue(key, val, indent)
+                        indent = indent or ""
+                        if type(val) == "table" then
+                            table.insert(lines, indent .. tostring(key) .. ":")
                             for k, v in pairs(val) do
-                                local keyStr = type(k) == "string" and ('["' .. k .. '"]') or ("[" .. tostring(k) .. "]")
-                                table.insert(lines, indent .. "  " .. keyStr .. " = ")
-                                luaSerialize(v, indent .. "  ")
-                                table.insert(lines, ",")
+                                dumpValue(k, v, indent .. "  ")
                             end
-                            table.insert(lines, indent .. "}")
+                        else
+                            table.insert(lines, indent .. tostring(key) .. ": " .. tostring(val))
                         end
-                    elseif type(val) == "string" then
-                        table.insert(lines, '"' .. val:gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n') .. '"')
-                    elseif type(val) == "boolean" then
-                        table.insert(lines, tostring(val))
-                    elseif type(val) == "number" then
-                        table.insert(lines, tostring(val))
-                    else
-                        table.insert(lines, '"' .. tostring(val) .. '"')
+                    end
+                    for k, v in pairs(tbl) do
+                        dumpValue(k, v, "")
+                    end
+                    return table.concat(lines, "\n")
+
+                elseif ext == ".lua" then
+                    local lines = {}
+                    local function luaSerialize(val, indent)
+                        indent = indent or ""
+                        if type(val) == "table" then
+                            local isArray = true
+                            local maxN = 0
+                            for k2, _ in pairs(val) do
+                                if type(k2) == "number" and k2 > 0 and math.floor(k2) == k2 then
+                                    if k2 > maxN then maxN = k2 end
+                                else
+                                    isArray = false
+                                    break
+                                end
+                            end
+                            if isArray and maxN == #val then
+                                table.insert(lines, "{")
+                                for _, v in ipairs(val) do
+                                    table.insert(lines, indent .. "  ")
+                                    luaSerialize(v, indent .. "  ")
+                                    table.insert(lines, ",\n")
+                                end
+                                table.insert(lines, indent .. "}")
+                            else
+                                table.insert(lines, "{")
+                                for k2, v in pairs(val) do
+                                    local keyStr = type(k2) == "string" and ('["' .. k2 .. '"]') or ("[" .. tostring(k2) .. "]")
+                                    table.insert(lines, "\n" .. indent .. "  " .. keyStr .. " = ")
+                                    luaSerialize(v, indent .. "  ")
+                                    table.insert(lines, ",")
+                                end
+                                table.insert(lines, "\n" .. indent .. "}")
+                            end
+                        elseif type(val) == "string" then
+                            table.insert(lines, '"' .. val:gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n') .. '"')
+                        elseif type(val) == "boolean" or type(val) == "number" then
+                            table.insert(lines, tostring(val))
+                        else
+                            table.insert(lines, '"' .. tostring(val) .. '"')
+                        end
+                    end
+                    table.insert(lines, "local data = ")
+                    luaSerialize(tbl, "")
+                    table.insert(lines, "\nreturn data")
+                    return table.concat(lines)
+                end
+                return tostring(tbl)
+            end
+
+            -- Utility: safely write a file with pcall
+            local function safeWrite(path, content)
+                pcall(function()
+                    writefile(path, content)
+                end)
+            end
+
+            -- Utility: safely make a folder
+            local function safeFolder(path)
+                pcall(function()
+                    makefolder(path)
+                end)
+            end
+
+            -- Utility: try to decompile a script instance
+            local function tryDecompile(scriptInstance)
+                if decompile then
+                    local ok, source = pcall(decompile, scriptInstance)
+                    if ok and type(source) == "string" and source ~= "" then
+                        return source
                     end
                 end
-                table.insert(lines, "-- Full Debug Dump")
-                table.insert(lines, "-- Generated: " .. os.date("%Y-%m-%d %H:%M:%S"))
-                table.insert(lines, "")
-                table.insert(lines, "local data = ")
-                luaSerialize(data, "")
-                table.insert(lines, "")
-                table.insert(lines, "return data")
-                output = table.concat(lines)
+                -- Fallback: try getsourcecode / getscriptsource
+                if getsourcecode then
+                    local ok, source = pcall(getsourcecode, scriptInstance)
+                    if ok and type(source) == "string" and source ~= "" then
+                        return source
+                    end
+                end
+                return nil
             end
 
-            -- Write file
-            local writeOk, writeErr = pcall(function()
-                writefile(fileName, output)
-            end)
+            -- Create root folder
+            local root = "all"
+            safeFolder(root)
 
-            if writeOk then
-                Fluent:Notify({
-                    Title = "Dump Complete",
-                    Content = "Saved as '" .. fileName .. "' in workspace folder.",
-                    Duration = 5
-                })
-                print("[Debugger] Dump saved to: " .. fileName)
-            else
-                Fluent:Notify({
-                    Title = "Dump Failed",
-                    Content = "writefile error: " .. tostring(writeErr),
-                    Duration = 5
-                })
-                print("[Debugger] Dump failed: " .. tostring(writeErr))
+            local totalFiles = 0
+            local errors = {}
+
+            -- ===== PlayerInfo =====
+            do
+                local dir = root .. "/PlayerInfo"
+                safeFolder(dir)
+                local lp = Players.LocalPlayer
+                local info = {
+                    Name = tostring(lp.Name),
+                    DisplayName = tostring(lp.DisplayName),
+                    UserId = lp.UserId,
+                    AccountAge = lp.AccountAge,
+                    Premium = (lp.MembershipType == Enum.MembershipType.Premium),
+                    Team = tostring(lp.Team),
+                }
+                pcall(function()
+                    local char = lp.Character
+                    if char then
+                        info.Character = tostring(char)
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            info.Health = hum.Health
+                            info.MaxHealth = hum.MaxHealth
+                            info.WalkSpeed = hum.WalkSpeed
+                            info.JumpPower = hum.JumpPower
+                            info.HumanoidState = tostring(hum:GetState())
+                        end
+                        local r = char:FindFirstChild("HumanoidRootPart")
+                        if r then
+                            info.Position = tostring(r.Position)
+                            info.CFrame = tostring(r.CFrame)
+                            info.Velocity = tostring(r.AssemblyLinearVelocity)
+                        end
+                    end
+                end)
+                safeWrite(dir .. "/info" .. ext, serialize(info))
+                totalFiles = totalFiles + 1
             end
+
+            -- ===== GameInfo =====
+            do
+                local dir = root .. "/GameInfo"
+                safeFolder(dir)
+                local info = {
+                    PlaceId = game.PlaceId,
+                    JobId = game.JobId,
+                    PlaceVersion = game.PlaceVersion,
+                    PlayerCount = #Players:GetPlayers(),
+                    ServerTime = workspace.DistributedGameTime,
+                }
+                pcall(function()
+                    local pInfo = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+                    info.GameName = tostring(pInfo.Name)
+                    info.Creator = tostring(pInfo.Creator and pInfo.Creator.Name)
+                end)
+                -- Also dump all players in server
+                info.Players = {}
+                pcall(function()
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        table.insert(info.Players, {Name = p.Name, DisplayName = p.DisplayName, UserId = p.UserId})
+                    end
+                end)
+                safeWrite(dir .. "/info" .. ext, serialize(info))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== ExecutorInfo =====
+            do
+                local dir = root .. "/ExecutorInfo"
+                safeFolder(dir)
+                local info = {}
+                pcall(function() info.request = (request ~= nil) end)
+                pcall(function() info.http_request = (http_request ~= nil) end)
+                pcall(function() info.syn_request = (syn ~= nil and syn.request ~= nil) end)
+                pcall(function() info.getrawmetatable = (getrawmetatable ~= nil) end)
+                pcall(function() info.setreadonly = (setreadonly ~= nil) end)
+                pcall(function() info.getnamecallmethod = (getnamecallmethod ~= nil) end)
+                pcall(function() info.hookfunction = (hookfunction ~= nil) end)
+                pcall(function() info.hookmetamethod = (hookmetamethod ~= nil) end)
+                pcall(function() info.decompile = (decompile ~= nil) end)
+                pcall(function() info.getgc = (getgc ~= nil) end)
+                pcall(function() info.getscripts = (getscripts ~= nil) end)
+                pcall(function() info.getsenv = (getsenv ~= nil) end)
+                pcall(function() info.writefile = (writefile ~= nil) end)
+                pcall(function() info.makefolder = (makefolder ~= nil) end)
+                pcall(function() info.identifyexecutor = identifyexecutor and identifyexecutor() or "unknown" end)
+                safeWrite(dir .. "/info" .. ext, serialize(info))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== RemoteEvents =====
+            do
+                local dir = root .. "/RemoteEvents"
+                safeFolder(dir)
+                local index = {}
+                local count = 0
+                pcall(function()
+                    for _, obj in ipairs(game:GetDescendants()) do
+                        if obj:IsA("RemoteEvent") then
+                            count = count + 1
+                            local fullName = obj:GetFullName()
+                            local safeName = sanitize(obj.Name) .. "_" .. count
+                            table.insert(index, {Index = count, Name = obj.Name, FullName = fullName, File = safeName .. ext})
+                            local data = {
+                                ClassName = "RemoteEvent",
+                                Name = obj.Name,
+                                FullName = fullName,
+                                Parent = tostring(obj.Parent),
+                            }
+                            safeWrite(dir .. "/" .. safeName .. ext, serialize(data))
+                            totalFiles = totalFiles + 1
+                        end
+                    end
+                end)
+                safeWrite(dir .. "/_index" .. ext, serialize({Total = count, Events = index}))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== RemoteFunctions =====
+            do
+                local dir = root .. "/RemoteFunctions"
+                safeFolder(dir)
+                local index = {}
+                local count = 0
+                pcall(function()
+                    for _, obj in ipairs(game:GetDescendants()) do
+                        if obj:IsA("RemoteFunction") then
+                            count = count + 1
+                            local fullName = obj:GetFullName()
+                            local safeName = sanitize(obj.Name) .. "_" .. count
+                            table.insert(index, {Index = count, Name = obj.Name, FullName = fullName, File = safeName .. ext})
+                            local data = {
+                                ClassName = "RemoteFunction",
+                                Name = obj.Name,
+                                FullName = fullName,
+                                Parent = tostring(obj.Parent),
+                            }
+                            safeWrite(dir .. "/" .. safeName .. ext, serialize(data))
+                            totalFiles = totalFiles + 1
+                        end
+                    end
+                end)
+                safeWrite(dir .. "/_index" .. ext, serialize({Total = count, Functions = index}))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== BindableEvents =====
+            do
+                local dir = root .. "/BindableEvents"
+                safeFolder(dir)
+                local index = {}
+                local count = 0
+                pcall(function()
+                    for _, obj in ipairs(game:GetDescendants()) do
+                        if obj:IsA("BindableEvent") then
+                            count = count + 1
+                            local fullName = obj:GetFullName()
+                            local safeName = sanitize(obj.Name) .. "_" .. count
+                            table.insert(index, {Index = count, Name = obj.Name, FullName = fullName, File = safeName .. ext})
+                            local data = {
+                                ClassName = "BindableEvent",
+                                Name = obj.Name,
+                                FullName = fullName,
+                                Parent = tostring(obj.Parent),
+                            }
+                            safeWrite(dir .. "/" .. safeName .. ext, serialize(data))
+                            totalFiles = totalFiles + 1
+                        end
+                    end
+                end)
+                safeWrite(dir .. "/_index" .. ext, serialize({Total = count, Events = index}))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== BindableFunctions =====
+            do
+                local dir = root .. "/BindableFunctions"
+                safeFolder(dir)
+                local index = {}
+                local count = 0
+                pcall(function()
+                    for _, obj in ipairs(game:GetDescendants()) do
+                        if obj:IsA("BindableFunction") then
+                            count = count + 1
+                            local fullName = obj:GetFullName()
+                            local safeName = sanitize(obj.Name) .. "_" .. count
+                            table.insert(index, {Index = count, Name = obj.Name, FullName = fullName, File = safeName .. ext})
+                            local data = {
+                                ClassName = "BindableFunction",
+                                Name = obj.Name,
+                                FullName = fullName,
+                                Parent = tostring(obj.Parent),
+                            }
+                            safeWrite(dir .. "/" .. safeName .. ext, serialize(data))
+                            totalFiles = totalFiles + 1
+                        end
+                    end
+                end)
+                safeWrite(dir .. "/_index" .. ext, serialize({Total = count, Functions = index}))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== LocalScripts (with decompiled source) =====
+            do
+                local dir = root .. "/LocalScripts"
+                safeFolder(dir)
+                local index = {}
+                local count = 0
+                local decompileCount = 0
+                pcall(function()
+                    for _, obj in ipairs(game:GetDescendants()) do
+                        if obj:IsA("LocalScript") then
+                            count = count + 1
+                            local fullName = obj:GetFullName()
+                            local safeName = sanitize(obj.Name) .. "_" .. count
+
+                            -- Create a subfolder for each script to hold both info and source
+                            local scriptDir = dir .. "/" .. safeName
+                            safeFolder(scriptDir)
+
+                            local info = {
+                                ClassName = "LocalScript",
+                                Name = obj.Name,
+                                FullName = fullName,
+                                Disabled = obj.Disabled,
+                                Parent = tostring(obj.Parent),
+                            }
+                            safeWrite(scriptDir .. "/info" .. ext, serialize(info))
+                            totalFiles = totalFiles + 1
+
+                            -- Try to decompile the script source
+                            local source = tryDecompile(obj)
+                            if source then
+                                safeWrite(scriptDir .. "/source.lua", source)
+                                decompileCount = decompileCount + 1
+                                totalFiles = totalFiles + 1
+                            end
+
+                            table.insert(index, {
+                                Index = count,
+                                Name = obj.Name,
+                                FullName = fullName,
+                                Disabled = obj.Disabled,
+                                Folder = safeName,
+                                HasSource = (source ~= nil)
+                            })
+                        end
+                    end
+                end)
+                safeWrite(dir .. "/_index" .. ext, serialize({Total = count, Decompiled = decompileCount, Scripts = index}))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== ModuleScripts (with decompiled source) =====
+            do
+                local dir = root .. "/ModuleScripts"
+                safeFolder(dir)
+                local index = {}
+                local count = 0
+                local decompileCount = 0
+                pcall(function()
+                    for _, obj in ipairs(game:GetDescendants()) do
+                        if obj:IsA("ModuleScript") then
+                            count = count + 1
+                            local fullName = obj:GetFullName()
+                            local safeName = sanitize(obj.Name) .. "_" .. count
+
+                            local scriptDir = dir .. "/" .. safeName
+                            safeFolder(scriptDir)
+
+                            local info = {
+                                ClassName = "ModuleScript",
+                                Name = obj.Name,
+                                FullName = fullName,
+                                Parent = tostring(obj.Parent),
+                            }
+                            safeWrite(scriptDir .. "/info" .. ext, serialize(info))
+                            totalFiles = totalFiles + 1
+
+                            local source = tryDecompile(obj)
+                            if source then
+                                safeWrite(scriptDir .. "/source.lua", source)
+                                decompileCount = decompileCount + 1
+                                totalFiles = totalFiles + 1
+                            end
+
+                            table.insert(index, {
+                                Index = count,
+                                Name = obj.Name,
+                                FullName = fullName,
+                                Folder = safeName,
+                                HasSource = (source ~= nil)
+                            })
+                        end
+                    end
+                end)
+                safeWrite(dir .. "/_index" .. ext, serialize({Total = count, Decompiled = decompileCount, Scripts = index}))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== RunningScripts =====
+            do
+                local dir = root .. "/RunningScripts"
+                safeFolder(dir)
+                local index = {}
+                local count = 0
+                pcall(function()
+                    if getscripts then
+                        for _, s in ipairs(getscripts()) do
+                            count = count + 1
+                            local safeName = sanitize(s.Name) .. "_" .. count
+
+                            local scriptDir = dir .. "/" .. safeName
+                            safeFolder(scriptDir)
+
+                            local info = {
+                                Name = tostring(s.Name),
+                                FullName = tostring(s:GetFullName()),
+                                ClassName = s.ClassName,
+                            }
+                            safeWrite(scriptDir .. "/info" .. ext, serialize(info))
+                            totalFiles = totalFiles + 1
+
+                            local source = tryDecompile(s)
+                            if source then
+                                safeWrite(scriptDir .. "/source.lua", source)
+                                totalFiles = totalFiles + 1
+                            end
+
+                            table.insert(index, {
+                                Index = count,
+                                Name = tostring(s.Name),
+                                FullName = tostring(s:GetFullName()),
+                                Folder = safeName,
+                                HasSource = (source ~= nil)
+                            })
+                        end
+                    end
+                end)
+                safeWrite(dir .. "/_index" .. ext, serialize({Total = count, Scripts = index}))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== Performance =====
+            do
+                local dir = root .. "/Performance"
+                safeFolder(dir)
+                local info = {}
+                pcall(function() info.LuaMemoryMB = collectgarbage("count") / 1024 end)
+                pcall(function()
+                    local stats = game:GetService("Stats")
+                    info.DataReceiveKbps = stats.DataReceiveKbps
+                    info.DataSendKbps = stats.DataSendKbps
+                end)
+                pcall(function()
+                    info.ServerUptime = workspace.DistributedGameTime
+                end)
+                safeWrite(dir .. "/info" .. ext, serialize(info))
+                totalFiles = totalFiles + 1
+            end
+
+            -- ===== Summary file at root =====
+            do
+                local summary = {
+                    Timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+                    Format = ext,
+                    TotalFiles = totalFiles,
+                    Folders = {
+                        "PlayerInfo",
+                        "GameInfo",
+                        "ExecutorInfo",
+                        "RemoteEvents",
+                        "RemoteFunctions",
+                        "BindableEvents",
+                        "BindableFunctions",
+                        "LocalScripts",
+                        "ModuleScripts",
+                        "RunningScripts",
+                        "Performance",
+                    },
+                    Note = "Each folder contains an _index file listing all entries. Script folders contain info + source.lua when decompile is available."
+                }
+                safeWrite(root .. "/summary" .. ext, serialize(summary))
+            end
+
+            Fluent:Notify({
+                Title = "Dump Complete",
+                Content = totalFiles .. " files saved to 'all/' folder.",
+                Duration = 8
+            })
+            print("[Debugger] Dump complete: " .. totalFiles .. " files written to all/")
         end
     })
 
