@@ -4,11 +4,13 @@ if getgenv().Window then
     end)
     getgenv().Window = nil
 end
-if getgenv()._FluentLib then
-    getgenv()._FluentLib = nil
-end
 
-local Fluent = getgenv()._FluentLib or loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local Fluent = getgenv()._FluentLib
+if not Fluent then
+    Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+    getgenv()._FluentLib = Fluent
+end
+getgenv().Fluent = Fluent
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
@@ -123,6 +125,7 @@ local Options = Fluent.Options
 getgenv().Tabs = Tabs
 getgenv().Options = Options
 getgenv().Window = Window
+getgenv().Fluent = Fluent
 
 do
     local time = os.time()

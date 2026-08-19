@@ -10,6 +10,7 @@ end
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 getgenv()._FluentLib = Fluent
+getgenv().Fluent = Fluent
 local HttpService = game:GetService("HttpService")
 local PlaceId = game.PlaceId
 local Request = request or http_request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request)
@@ -160,6 +161,10 @@ if success then
 
                     if loadRemoteScript(file.download_url, mapName) then
                         found = true
+                        if not loadRemoteScript(UNIVERSAL_SCRIPT_URL, "hub shell") then
+                            warn("[gokuthug1's Hub] Game profile loaded, but hub shell failed to start.")
+                            notify("Game profile loaded, but the hub UI failed to start.")
+                        end
                         break
                     end
                 end

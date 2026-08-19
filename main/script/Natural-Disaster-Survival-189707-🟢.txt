@@ -648,5 +648,3 @@ getgenv().ScriptGe = function()
         tornado.Network(Options.NDS_NetworkOwn.Value)
     end)
 end
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/main/NoGame.lua"))()
