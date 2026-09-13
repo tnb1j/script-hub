@@ -1,8 +1,7 @@
-getgenv().Tabs = nil
-getgenv().Options = nil
-getgenv().Window = nil
-getgenv().Toggle = nil
-getgenv().Value = nil
+local Fluent = getgenv().Fluent or getgenv()._FluentLib
+local Tabs = getgenv().Tabs
+local Options = getgenv().Options or (Fluent and Fluent.Options)
+local Window = getgenv().Window
 
 getgenv().GameName = "Timebomb Duels!"
 
@@ -36,6 +35,11 @@ getgenv().update = function()
 end
 
 getgenv().ScriptGe = function()
+    local Fluent = getgenv().Fluent or getgenv()._FluentLib
+    local Tabs = getgenv().Tabs
+    local Options = getgenv().Options or (Fluent and Fluent.Options)
+    local Window = getgenv().Window
+    if not Tabs or not Tabs.Gameworks then return end
 
 getgenv().EnemyDetection = false
 getgenv().AFKMode = false
@@ -1242,8 +1246,10 @@ AutoJoinToggle:OnChanged(function()
     end
 end)
 
+local findBestSlotOpposite
+
 function startAutoJoinLoop()
-    spawn(function()
+    task.spawn(function()
         local lastJoinedArena = nil
         local lastJoinedSide = nil
         local lastJoinedSlot = nil

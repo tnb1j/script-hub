@@ -1,6 +1,7 @@
-getgenv().Tabs = nil
-getgenv().Options = nil
-getgenv().Window = nil
+local Fluent = getgenv().Fluent or getgenv()._FluentLib
+local Tabs = getgenv().Tabs
+local Options = getgenv().Options or (Fluent and Fluent.Options)
+local Window = getgenv().Window
 
 getgenv().GameName = "Funky Friday"
 
@@ -9,6 +10,11 @@ if getgenv().ScriptGe then
 end
 
 getgenv().ScriptGe = function()
+    local Fluent = getgenv().Fluent or getgenv()._FluentLib
+    local Tabs = getgenv().Tabs
+    local Options = getgenv().Options or (Fluent and Fluent.Options)
+    local Window = getgenv().Window
+    if not Tabs or not Tabs.Gameworks then return end
     local defaults = {
         Autoplay = false,
         AutoplayMethod = 2,
@@ -250,7 +256,8 @@ getgenv().ScriptGe = function()
         if lane and lane:IsA("Frame") and tonumber(lane.Name:gsub("Lane", "") .. "") then
             local laneIndex = tonumber(lane.Name:gsub("Lane", "") .. "")
             lanes = math.max(laneIndex, lanes)
-            local notes = lane:WaitForChild("Notes", 9e9)
+            local notes = lane:WaitForChild("Notes", 10)
+            if not notes then return end
             cons[#cons + 1] = notes.ChildAdded:Connect(function(note)
                 onNoteAdded(note, laneIndex)
             end)
@@ -263,7 +270,11 @@ getgenv().ScriptGe = function()
     local function onScreenAdded(screen)
         if screen and screen.Name == "Window" then
             lanes = 0
-            local myField = screen:WaitForChild("Game", 9e9):WaitForChild("Fields", 9e9):WaitForChild(side, 9e9):WaitForChild("Inner", 9e9)
+            local gameGui = screen:WaitForChild("Game", 10)
+            local fields = gameGui and gameGui:WaitForChild("Fields", 10)
+            local sideFolder = fields and fields:WaitForChild(side, 10)
+            local myField = sideFolder and sideFolder:WaitForChild("Inner", 10)
+            if not myField then return end
             cons[#cons + 1] = myField.ChildAdded:Connect(onLaneAdded)
             for _, lane in myField:GetChildren() do onLaneAdded(lane) end
         end

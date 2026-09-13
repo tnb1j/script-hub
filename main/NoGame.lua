@@ -427,15 +427,32 @@ do
     end
 
     do
+        local invisConn = nil
         local InvisToggle = Tabs.Script:AddToggle("Invisible_Toggle", { Title = "Local Invisibility", Default = false })
         InvisToggle:OnChanged(function()
-            pcall(function()
-                for _, p in pairs(player.Character:GetDescendants()) do
-                    if p:IsA("BasePart") or p:IsA("Decal") then
-                        p.LocalTransparencyModifier = Options.Invisible_Toggle.Value and 1 or 0
+            if Options.Invisible_Toggle.Value then
+                if invisConn then invisConn:Disconnect() end
+                invisConn = RunService.RenderStepped:Connect(function()
+                    if player.Character then
+                        for _, p in pairs(player.Character:GetDescendants()) do
+                            if p:IsA("BasePart") or p:IsA("Decal") then
+                                p.LocalTransparencyModifier = 1
+                            end
+                        end
                     end
+                end)
+            else
+                if invisConn then invisConn:Disconnect(); invisConn = nil end
+                if player.Character then
+                    pcall(function()
+                        for _, p in pairs(player.Character:GetDescendants()) do
+                            if p:IsA("BasePart") or p:IsA("Decal") then
+                                p.LocalTransparencyModifier = 0
+                            end
+                        end
+                    end)
                 end
-            end)
+            end
         end)
     end
 
@@ -657,6 +674,22 @@ do
             end
         end
     end)
+
+    -- Automatic Character Respawn Persistence
+    player.CharacterAdded:Connect(function(newChar)
+        task.wait(0.5)
+        pcall(function()
+            local hum = newChar:WaitForChild("Humanoid", 3)
+            if hum then
+                if Options.WalkSpeedSlider and Options.WalkSpeedSlider.Value and Options.WalkSpeedSlider.Value ~= 16 then
+                    hum.WalkSpeed = Options.WalkSpeedSlider.Value
+                end
+                if Options.JumpPowerSlider and Options.JumpPowerSlider.Value and Options.JumpPowerSlider.Value ~= 50 then
+                    hum.JumpPower = Options.JumpPowerSlider.Value
+                end
+            end
+        end)
+    end)
     
     -- =====================================
     -- UI: UNIVERSAL TAB
@@ -741,6 +774,18 @@ do
         Description = "Generates and teleports you to a private server in the current game.",
         Callback = function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Privateserver.lua"))()
+        end
+    })
+
+    Tabs.Universal:AddButton({
+        Title = "Open Custom Settings UI",
+        Description = "Launches the standalone custom settings and theme editor interface.",
+        Callback = function()
+            if getgenv().OpenCustomSettingsUI then
+                getgenv().OpenCustomSettingsUI()
+            else
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/main/Settings.lua"))()
+            end
         end
     })
 
@@ -925,7 +970,8 @@ do
         return false
     end
 
-    if hookmetamethod then
+    if hookmetamethod and not getgenv()._GokuListenerHooked then
+        getgenv()._GokuListenerHooked = true
         local oldNamecall
         local function hook(self, ...)
             if not checkcaller() then
@@ -2340,15 +2386,26 @@ do
                 if isGuiOpen then
                     local currentTime = tick()
                     local deltaTime = currentTime - lastUpdateTime
-                    local actualFPS = math.floor(fpsValue / deltaTime)
-                    local cpuUsage = math.random(10, 70)
-                    local gpuUsage = math.random(10, 70)
-                    local memoryUsage = math.random(20, 80)
-                    local ping = math.random(40, 120)
+                    local actualFPS = deltaTime > 0 and math.floor(fpsValue / deltaTime) or 60
+                    local statsService = game:GetService("Stats")
+                    local memoryUsage = math.floor(statsService:GetTotalMemoryUsageMb())
+                    local ping = 0
+                    pcall(function()
+                        local pingStr = statsService.Network.ServerStatsItem["Data Ping"]:GetValueString()
+                        ping = math.floor(tonumber(pingStr:match("%d+%.?%d*")) or 0)
+                    end)
+                    local cpuUsage = 0
+                    pcall(function()
+                        cpuUsage = math.floor(statsService.PerformanceStats.CPU:GetValue() or 0)
+                    end)
+                    local gpuUsage = 0
+                    pcall(function()
+                        gpuUsage = math.floor(statsService.PerformanceStats.GPU:GetValue() or 0)
+                    end)
 
-                    frames[1].textLabel.Text = "CPU: " .. cpuUsage .. "%"
-                    frames[2].textLabel.Text = "GPU: " .. gpuUsage .. "%"
-                    frames[3].textLabel.Text = "Memory: " .. memoryUsage .. "%"
+                    frames[1].textLabel.Text = "CPU: " .. cpuUsage .. " ms"
+                    frames[2].textLabel.Text = "GPU: " .. gpuUsage .. " ms"
+                    frames[3].textLabel.Text = "Memory: " .. memoryUsage .. " MB"
                     frames[4].textLabel.Text = "Ping: " .. ping .. " ms"
                     frames[5].textLabel.Text = "FPS: " .. actualFPS
                 end
@@ -2458,10 +2515,10 @@ do
         end)
         pcall(function()
             local TextChatService = game:GetService("TextChatService")
-            TextChatService.OnIncomingMessage = function(message)
+            TextChatService.MessageReceived:Connect(function(message)
                 local pName = message.TextSource and message.TextSource.Name or "System"
                 addLog(pName, message.Text)
-            end
+            end)
         end)
         
         local dragging, dragInput, dragStart, startPos
@@ -2505,7 +2562,8 @@ do
         Content = "🟢 Fully Functional: Complete architectural profile script adaptation.\n🟠 Partially Functional: Legacy build layout; features could run inconsistently.\n🔴 Non-Functional: Patched structural security layout limits exploitation."
     })
 
-    -- Dynamically requests content lists from your new repository
+    -- Dynamically requests content lists from repository with fallback to cached static registry
+    local gamesList = {}
     local map_success, map_response = httpGet(SCRIPT_DIRECTORY_URL)
     
     if map_success then
@@ -2513,38 +2571,48 @@ do
             return HttpService:JSONDecode(map_response)
         end)
 
-        if decoded and type(data) == "table" then
-    
+        if decoded and type(data) == "table" and not data.message then
             for _, file in pairs(data) do
                 if type(file) == "table" and file.name then
-            
-            -- Reads the new hyphen structure: Timebomb-Duels-11379739543-🟢.lua
                     local mapName, mapId, status = parseScriptFileName(file.name)
-            
                     if mapName and mapId and status then
-                Tabs.game:AddButton({
-                    Title = mapName .. " [" .. status .. "]",
-                    Description = "Target Universe Routing Sequence ID: " .. tostring(mapId),
-                    Callback = function()
-                        Window:Dialog({
-                            Title = "Initialize Crossroads Cross-Teleportation",
-                            Content = "Initiating global teleport protocol query straight toward: " .. mapName,
-                            Buttons = {
-                                { Title = "Confirm", Callback = function() game:GetService("TeleportService"):Teleport(mapId, player) end },
-                                { Title = "Cancel" }
-                            }
-                        })
-                    end
-                })
+                        table.insert(gamesList, { name = mapName, id = mapId, status = status })
                     end
                 end
             end
-        else
-            warn("[gokuthug1's Hub] Failed to decode game directory payload.")
         end
-    else
-        warn("[gokuthug1's Hub] Failed to fetch game directory payload: " .. tostring(map_response))
-    end    -- =====================================
+    end
+
+    -- Fallback to static cached registry if API is rate-limited (HTTP 403) or offline
+    if #gamesList == 0 and getgenv()._GokuGameRegistry then
+        for placeId, info in pairs(getgenv()._GokuGameRegistry) do
+            table.insert(gamesList, {
+                name = info.name or "Game",
+                id = placeId,
+                status = info.status or "🟢"
+            })
+        end
+    end
+
+    table.sort(gamesList, function(a, b) return a.name < b.name end)
+
+    for _, g in ipairs(gamesList) do
+        Tabs.game:AddButton({
+            Title = g.name .. " [" .. g.status .. "]",
+            Description = "Target Universe Routing Sequence ID: " .. tostring(g.id),
+            Callback = function()
+                Window:Dialog({
+                    Title = "Initialize Crossroads Cross-Teleportation",
+                    Content = "Initiating global teleport protocol query straight toward: " .. g.name,
+                    Buttons = {
+                        { Title = "Confirm", Callback = function() game:GetService("TeleportService"):Teleport(g.id, player) end },
+                        { Title = "Cancel" }
+                    }
+                })
+            end
+        })
+    end
+    -- =====================================
     -- UI: CUSTOM MACRO KEYBINDS
     -- =====================================
     Tabs.Settings:AddSection("Custom Macro Keybinds")

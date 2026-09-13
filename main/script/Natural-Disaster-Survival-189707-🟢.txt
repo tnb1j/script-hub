@@ -1,6 +1,7 @@
-getgenv().Tabs = nil
-getgenv().Options = nil
-getgenv().Window = nil
+local Fluent = getgenv().Fluent or getgenv()._FluentLib
+local Tabs = getgenv().Tabs
+local Options = getgenv().Options or (Fluent and Fluent.Options)
+local Window = getgenv().Window
 
 getgenv().GameName = "Natural Disaster Survival"
 
@@ -9,6 +10,12 @@ if getgenv().ScriptGe then
 end
 
 getgenv().ScriptGe = function()
+    local Fluent = getgenv().Fluent or getgenv()._FluentLib
+    local Tabs = getgenv().Tabs
+    local Options = getgenv().Options or (Fluent and Fluent.Options)
+    local Window = getgenv().Window
+    if not Tabs or not Tabs.Gameworks then return end
+
     local vec = vector and vector.create or Vector3.new
     local defaults = {
         Noclip = false,
@@ -48,8 +55,27 @@ getgenv().ScriptGe = function()
 
     getGlobalTable().FireHubLoaded = true
 
-    local txtf = loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Null-Fire/main/Core/Libraries/Side-Text/Main.lua"))()
-    local tornado = getGlobalTable().TornadoFE or loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Null-Fire/refs/heads/main/Core/Libraries/Tornado/Main.lua"))()
+    local txtf = nil
+    pcall(function()
+        txtf = loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Null-Fire/main/Core/Libraries/Side-Text/Main.lua"))()
+    end)
+    txtf = txtf or {
+        create = function(...) return { Set = function() end, Destroy = function() end } end,
+        destroy = function() end
+    }
+
+    local tornado = getGlobalTable().TornadoFE
+    if not tornado then
+        pcall(function()
+            tornado = loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Null-Fire/refs/heads/main/Core/Libraries/Tornado/Main.lua"))()
+        end)
+    end
+    tornado = tornado or {
+        _IsSafe = function() return false end,
+        Properties = { Enabled = false, ReverseLayers = false },
+        Network = { Active = false },
+        Tornado = function() end
+    }
 
     local plr = game:GetService("Players").LocalPlayer
     local realCharacter = plr.Character or plr.CharacterAdded:Wait()

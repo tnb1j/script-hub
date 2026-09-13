@@ -18,14 +18,26 @@ local function HexToColor(hex)
 end
 
 local function GetUIContainer()
+    if gethui then
+        local ok, hui = pcall(gethui)
+        if ok and hui then return hui end
+    end
     if game:GetService("RunService"):IsStudio() then
         return Player:WaitForChild("PlayerGui")
     end
     local success, coreGui = pcall(function() return game:GetService("CoreGui") end)
-    if success and coreGui:FindFirstChild("RobloxGui") then
-        return coreGui.RobloxGui
+    if success and coreGui then
+        if coreGui:FindFirstChild("RobloxGui") then
+            return coreGui.RobloxGui
+        end
+        return coreGui
     end
     return Player:WaitForChild("PlayerGui")
+end
+
+if getgenv()._GokuSettingsUI then
+    pcall(function() getgenv()._GokuSettingsUI:Destroy() end)
+    getgenv()._GokuSettingsUI = nil
 end
 
 local SettingsUI = Instance.new("ScreenGui")
@@ -36,6 +48,7 @@ SettingsUI.IgnoreGuiInset = true
 SettingsUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 SettingsUI.DisplayOrder = 999
 SettingsUI.Parent = GetUIContainer()
+getgenv()._GokuSettingsUI = SettingsUI
 
 local UIScale = Instance.new("UIScale")
 UIScale.Parent = SettingsUI
@@ -678,4 +691,8 @@ local Library = {
     OpenPicker = function(...) return Lib:OpenPicker(...) end,
     Create = function(self, ...) return Lib:Create(...) end
 }
+getgenv().GokuCustomSettings = Library
+getgenv().OpenCustomSettingsUI = function()
+    SettingsUI.Enabled = not SettingsUI.Enabled
+end
 return Library

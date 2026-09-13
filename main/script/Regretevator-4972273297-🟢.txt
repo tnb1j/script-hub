@@ -1,10 +1,10 @@
-getgenv().Tabs = nil
-getgenv().Options = nil
-getgenv().Window = nil
-getgenv().Toggle = nil
-getgenv().Value = nil
+local Fluent = getgenv().Fluent or getgenv()._FluentLib
+local Tabs = getgenv().Tabs
+local Options = getgenv().Options or (Fluent and Fluent.Options)
+local Window = getgenv().Window
 
 getgenv().GameName = "Regretevator"
+getgenv().ObbyActionDelay = getgenv().ObbyActionDelay or 3
 
 if getgenv().ScriptGe then
     getgenv().ScriptGe = nil
@@ -49,6 +49,12 @@ getgenv().update = function()
 end
 
 getgenv().ScriptGe = function()
+    local Fluent = getgenv().Fluent or getgenv()._FluentLib
+    local Tabs = getgenv().Tabs
+    local Options = getgenv().Options or (Fluent and Fluent.Options)
+    local Window = getgenv().Window
+    if not Tabs or not Tabs.Gameworks then return end
+
 function checkConcreteExists()
         if workspace.Elevator and workspace.Elevator.Ceiling and workspace.Elevator.Ceiling:FindFirstChild("Concrete") then
             return true
@@ -426,8 +432,8 @@ activateButtonsInPath()
                     local internalName = obbyMappings[obbyName]
                     if internalName then
                         if workspace:FindFirstChild(internalName) then
-                            spawn(function()
-                                wait(3)
+                            task.spawn(function()
+                                task.wait(getgenv().ObbyActionDelay or 3)
                                 if obbyActions[obbyName] then
                                     pcall(obbyActions[obbyName])
                                 end
@@ -435,7 +441,7 @@ activateButtonsInPath()
                         end
                     end
                 end
-                wait(1)
+                task.wait(1)
             end
         end)
         
@@ -445,8 +451,8 @@ activateButtonsInPath()
             for _, obbyName in ipairs(selectedObbies) do
                 local internalName = obbyMappings[obbyName]
                 if child.Name == internalName then
-                    spawn(function()
-                        wait(3)
+                    task.spawn(function()
+                        task.wait(getgenv().ObbyActionDelay or 3)
                         if obbyActions[obbyName] then
                             pcall(obbyActions[obbyName])
                         end
@@ -477,7 +483,7 @@ activateButtonsInPath()
         Max = 10,
         Rounding = 1,
         Callback = function(Value)
-            
+            getgenv().ObbyActionDelay = Value
         end
     })
     

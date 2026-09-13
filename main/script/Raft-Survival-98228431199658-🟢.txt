@@ -1,10 +1,10 @@
-getgenv().Tabs = nil
-getgenv().Options = nil
-getgenv().Window = nil
-getgenv().Toggle = nil
-getgenv().Value = nil
+local Fluent = getgenv().Fluent or getgenv()._FluentLib
+local Tabs = getgenv().Tabs
+local Options = getgenv().Options or (Fluent and Fluent.Options)
+local Window = getgenv().Window
 
 getgenv().GameName = "Raft Survival! 🚣"
+getgenv().AutoSpeed = getgenv().AutoSpeed or 0.3
 
 if getgenv().ScriptGe then
     getgenv().ScriptGe = nil
@@ -23,6 +23,11 @@ getgenv().update = function()
 end
 
 getgenv().ScriptGe = function()
+    local Fluent = getgenv().Fluent or getgenv()._FluentLib
+    local Tabs = getgenv().Tabs
+    local Options = getgenv().Options or (Fluent and Fluent.Options)
+    local Window = getgenv().Window
+    if not Tabs or not Tabs.Gameworks then return end
 
 local Slider = Tabs.Gameworks:AddSlider("Slider", {
     Title = "Auto speed adjustment",
@@ -126,9 +131,9 @@ function UpdateBuildingsList()
 end
 
 function AutoMineHarvestLoop()
-    spawn(function()
+    task.spawn(function()
         while getgenv().AutoMineHarvests do
-            wait(AutoSpeed)
+            task.wait(getgenv().AutoSpeed or 0.3)
             
             local Players = game:GetService("Players")
             local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -210,9 +215,9 @@ Toggle:OnChanged(function()
 end)
 
 function AutoBuyBuildingsLoop()
-    spawn(function()
+    task.spawn(function()
         while getgenv().AutoBuyBuildings do 
-            wait(AutoSpeed)
+            task.wait(getgenv().AutoSpeed or 0.3)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
@@ -264,9 +269,9 @@ Toggle:OnChanged(function()
 end)
 
 function AutoSellAllsLoop()
-    spawn(function()
+    task.spawn(function()
         while getgenv().AutoSellAlls do 
-            wait(AutoSpeed)
+            task.wait(getgenv().AutoSpeed or 0.3)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer

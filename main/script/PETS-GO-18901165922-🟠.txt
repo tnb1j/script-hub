@@ -1,16 +1,24 @@
-getgenv().Tabs = nil
-getgenv().Options = nil
-getgenv().Window = nil
-getgenv().Toggle = nil
-getgenv().Value = nil
+local Fluent = getgenv().Fluent or getgenv()._FluentLib
+local Tabs = getgenv().Tabs
+local Options = getgenv().Options or (Fluent and Fluent.Options)
+local Window = getgenv().Window
 
 getgenv().GameName = "PETS GO"
+getgenv().SpeedEggs = getgenv().SpeedEggs or 0.3
+getgenv().SpeedUpgrades = getgenv().SpeedUpgrades or 0.3
+getgenv().SpeedAutoFarmOrbs = getgenv().SpeedAutoFarmOrbs or 0.3
+getgenv().fruitsnumber = getgenv().fruitsnumber or 1
 
 if getgenv().ScriptGe then
     getgenv().ScriptGe = nil
 end
 
 getgenv().ScriptGe = function()
+    local Fluent = getgenv().Fluent or getgenv()._FluentLib
+    local Tabs = getgenv().Tabs
+    local Options = getgenv().Options or (Fluent and Fluent.Options)
+    local Window = getgenv().Window
+    if not Tabs or not Tabs.Gameworks then return end
 
 Tabs.Gameworks:AddSection("Auto")
 
@@ -40,10 +48,12 @@ Toggle:OnChanged(function()
 end)
 
 function startEggsRollLoop()
-    spawn(function()
+    task.spawn(function()
         while getgenv().Eggs_Roll do 
-            wait(SpeedEggs)
-            game:GetService("ReplicatedStorage").Network.Eggs_Roll:InvokeServer()
+            task.wait(getgenv().SpeedEggs or 0.3)
+            pcall(function()
+                game:GetService("ReplicatedStorage").Network.Eggs_Roll:InvokeServer()
+            end)
         end
     end)
 end
@@ -170,7 +180,7 @@ function startUpgradesRollLoop()
                 end
             end
 
-            wait(SpeedUpgrades)
+            task.wait(getgenv().SpeedUpgrades or 0.3)
         end
     end)
 end
@@ -302,8 +312,8 @@ startCollectingLoop()
     end)
     
     function startAutoFarmorbRollLoop()
-        spawn(function()
-            while wait(SpeedAutoFarmOrbs) do
+        task.spawn(function()
+            while task.wait(getgenv().SpeedAutoFarmOrbs or 0.3) do
                 if getgenv().AutoFarmorb then
                     local petsFolder = workspace.__THINGS.Pets
                     local breakablesFolder = workspace.__THINGS.Breakables
@@ -764,9 +774,9 @@ end
     })
     
     function AutoFruitConsumptionLoop()
-        spawn(function()
+        task.spawn(function()
             while getgenv().AutoFruitConsumption do 
-                wait(3) 
+                task.wait(3) 
         
                 local boostsFolder = game:GetService("Players").LocalPlayer.PlayerGui.Main.Boosts.Inner
         
@@ -783,7 +793,7 @@ end
                             if not boostsFolder:FindFirstChild(fruitName) then
                                 local args = {
                                     [1] = fruitCode,
-                                    [2] = getgenv().fruitsnumber 
+                                    [2] = getgenv().fruitsnumber or 1
                                 }
                                 game:GetService("ReplicatedStorage").Network:FindFirstChild("Fruits: Consume"):InvokeServer(unpack(args))
                             end
@@ -804,7 +814,7 @@ end
                 end
             end
         
-            local amount = getgenv().fruitsnumber 
+            local amount = getgenv().fruitsnumber or 1 
         
             local selectedFruitsList = useShinyFruits and fruitsShiny or fruits 
         

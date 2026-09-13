@@ -16,8 +16,18 @@ local UITextSizeConstraint = Instance.new("UITextSizeConstraint")
 local UIAspectRatioConstraint_2 = Instance.new("UIAspectRatioConstraint")
 local UIAspectRatioConstraint_3 = Instance.new("UIAspectRatioConstraint")
 
+local function GetSafeParent()
+    if gethui then
+        local ok, h = pcall(gethui)
+        if ok and h then return h end
+    end
+    local ok, cg = pcall(function() return game:GetService("CoreGui") end)
+    if ok and cg then return cg end
+    return game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+end
+
 Loading.Name = "Loading"
-Loading.Parent = game.CoreGui
+Loading.Parent = GetSafeParent()
 Loading.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 Frame.Parent = Loading
@@ -279,6 +289,26 @@ local function GenerateReservedServerCode(placeId)
     return accessCode, gameCode
 end
 
+local function HopToSmallestServer(placeId)
+    local HttpService = game:GetService("HttpService")
+    local TeleportService = game:GetService("TeleportService")
+    local ok, res = pcall(function()
+        return game:HttpGet(("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100"):format(tostring(placeId)))
+    end)
+    if ok and type(res) == "string" then
+        local decoded, data = pcall(function() return HttpService:JSONDecode(res) end)
+        if decoded and data and data.data then
+            for _, s in ipairs(data.data) do
+                if type(s) == "table" and s.id and s.playing and s.maxPlayers and s.playing < s.maxPlayers and s.id ~= game.JobId then
+                    TeleportService:TeleportToPlaceInstance(placeId, s.id, game:GetService("Players").LocalPlayer)
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function TeleportToPrivateServer(placeId, accessCode)
     local success, err = pcall(function()
         game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(placeId, "", accessCode)
@@ -319,6 +349,9 @@ local function main()
             getgenv().CONFIG.accessCode = accessCode
             return true
         else
+            -- Fallback to smallest / empty public server
+            local hopped = HopToSmallestServer(currentPlaceId)
+            if hopped then return true end
             return false
         end
     end)

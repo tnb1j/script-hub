@@ -1,10 +1,11 @@
-getgenv().Tabs = nil
-getgenv().Options = nil
-getgenv().Window = nil
-getgenv().Toggle = nil
-getgenv().Value = nil
+local Fluent = getgenv().Fluent or getgenv()._FluentLib
+local Tabs = getgenv().Tabs
+local Options = getgenv().Options or (Fluent and Fluent.Options)
+local Window = getgenv().Window
 
 getgenv().GameName = "Build An Island!"
+getgenv().SpeedAutoHitResource = getgenv().SpeedAutoHitResource or 0.3
+getgenv().SpeedAutodoubleFishrepeat = getgenv().SpeedAutodoubleFishrepeat or 1
 
 if getgenv().ScriptGe then
     getgenv().ScriptGe = nil
@@ -36,6 +37,11 @@ getgenv().update = function()
 end
 
 getgenv().ScriptGe = function()
+    local Fluent = getgenv().Fluent or getgenv()._FluentLib
+    local Tabs = getgenv().Tabs
+    local Options = getgenv().Options or (Fluent and Fluent.Options)
+    local Window = getgenv().Window
+    if not Tabs or not Tabs.Gameworks then return end
 
 Tabs.Gameworks:AddSection("Auto")
 
@@ -337,9 +343,9 @@ end)
 
 
 function ContributeToExpandAutoLoop()
-    spawn(function()
+    task.spawn(function()
         while getgenv().AutoContributeToExpandA do 
-            wait(SpeedAutoHitResource)
+            task.wait(getgenv().SpeedAutoHitResource or 0.3)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -653,9 +659,9 @@ spawn(function()
 end)
 
 function CrafterAutoLoop()
-    spawn(function()
+    task.spawn(function()
         while getgenv().AutoCrafterAutoA do
-            wait(SpeedAutoHitResource)
+            task.wait(getgenv().SpeedAutoHitResource or 0.3)
             local Players = game:GetService("Players")
             local ReplicatedStorage = game:GetService("ReplicatedStorage")
             local localPlayer = Players.LocalPlayer
@@ -710,7 +716,7 @@ Tabs.Gameworks:AddSection("Fish")
 
 local Slider = Tabs.Gameworks:AddSlider("Slider", {
     Title = "double Fish repeat",
-    Default = 0.3, 
+    Default = 1, 
     Min = 1,    
     Max = 100,  
     Rounding = 1, 
@@ -722,7 +728,8 @@ local Slider = Tabs.Gameworks:AddSlider("Slider", {
     local ImmediateCheckButton = Tabs.Gameworks:AddButton({
         Title = "Fish Check",
         Callback = function()
-            for i = 1, SpeedAutodoubleFishrepeat do
+            local count = tonumber(getgenv().SpeedAutodoubleFishrepeat) or 1
+            for i = 1, count do
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

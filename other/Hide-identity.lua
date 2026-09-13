@@ -38,8 +38,16 @@ pcall(function()
         if obj == game and key == "Name" then
             return getgenv().IdentityConfig.FakeGameName
         end
-        if tostring(obj) == "MembershipType" and key == "EnumItem" then
-            return getgenv().IdentityConfig.FakePremium and Enum.MembershipType.Premium or Enum.MembershipType.None
+        if (obj == Players.LocalPlayer or (typeof(obj) == "Instance" and obj:IsA("Player") and obj == Players.LocalPlayer)) then
+            if key == "MembershipType" then
+                return getgenv().IdentityConfig.FakePremium and Enum.MembershipType.Premium or Enum.MembershipType.None
+            end
+            if key == "Name" or key == "DisplayName" then
+                return getgenv().IdentityConfig.FakeName
+            end
+            if key == "UserId" then
+                return getgenv().IdentityConfig.FakeUserId
+            end
         end
         return oldIndex(obj, key)
     end
@@ -67,22 +75,26 @@ end
 local function applyPlayerChanges()
     local localPlayer = Players.LocalPlayer
 
-    if localPlayer.Name == savedData.originalName and not isLocationChanged(localPlayer, "Name") then
-        localPlayer.Name = getgenv().IdentityConfig.FakeName
-        markLocationChanged(localPlayer, "Name")
-    end
+    pcall(function()
+        if localPlayer.Name == savedData.originalName and not isLocationChanged(localPlayer, "Name") then
+            localPlayer.Name = getgenv().IdentityConfig.FakeName
+            markLocationChanged(localPlayer, "Name")
+        end
+    end)
 
-    if localPlayer.DisplayName == savedData.originalDisplayName and not isLocationChanged(localPlayer, "DisplayName") then
-        localPlayer.DisplayName = getgenv().IdentityConfig.FakeName
-        markLocationChanged(localPlayer, "DisplayName")
-    end
+    pcall(function()
+        if localPlayer.DisplayName == savedData.originalDisplayName and not isLocationChanged(localPlayer, "DisplayName") then
+            localPlayer.DisplayName = getgenv().IdentityConfig.FakeName
+            markLocationChanged(localPlayer, "DisplayName")
+        end
+    end)
 
-    if localPlayer.UserId == savedData.originalUserId and not isLocationChanged(localPlayer, "UserId") then
-        pcall(function()
+    pcall(function()
+        if localPlayer.UserId == savedData.originalUserId and not isLocationChanged(localPlayer, "UserId") then
             localPlayer.UserId = getgenv().IdentityConfig.FakeUserId
             markLocationChanged(localPlayer, "UserId")
-        end)
-    end
+        end
+    end)
 end
 
 local function updateWorkspaceNames(object)
