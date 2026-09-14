@@ -745,16 +745,16 @@ do
     })
 
     Tabs.Universal:AddButton({
-        Title = "Execute Dark Dex V4",
+        Title = "Execute Dex++",
         Description = "Roblox explorer and debugger.",
         Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+            loadstring(game:HttpGet("https://github.com/AZYsGithub/DexPlusPlus/releases/latest/download/out.lua"))()
         end
     })
 
     Tabs.Universal:AddButton({
         Title = "Execute GokuDex",
-        Description = "Custom Roblox explorer and instance viewer.",
+        Description = "My version of Dex.",
         Callback = function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/gokuthug1/GokuDex/refs/heads/main/GokuDex.lua"))()
         end
