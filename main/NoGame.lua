@@ -649,6 +649,7 @@ do
 
     getgenv().HitboxSettings = getgenv().HitboxSettings or {
         EnemyExpander = false,
+        TargetNPCs = false,
         TeamCheck = true,
         EnemySize = 15,
         EnemyTransparency = 0.5,
@@ -656,6 +657,41 @@ do
         SelfSize = 2,
         SelfTransparency = 1
     }
+
+    local ActiveNPCs = {}
+
+    local function checkNPC(v)
+        if v:IsA("Humanoid") and v.Parent and v.Parent:IsA("Model") then
+            local char = v.Parent
+            if char ~= player.Character and not Players:GetPlayerFromCharacter(char) then
+                if not table.find(ActiveNPCs, char) then
+                    table.insert(ActiveNPCs, char)
+                end
+            end
+        end
+    end
+
+    task.spawn(function()
+        for _, v in ipairs(workspace:GetDescendants()) do
+            checkNPC(v)
+        end
+    end)
+    workspace.DescendantAdded:Connect(checkNPC)
+
+    local function resetNPCHitboxes()
+        for _, char in ipairs(ActiveNPCs) do
+            if char and char.Parent then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    pcall(function()
+                        root.Size = Vector3.new(2, 2, 1)
+                        root.Transparency = 1
+                        root.CanCollide = true
+                    end)
+                end
+            end
+        end
+    end
 
     local function getRootPart(character)
         if not character then
@@ -688,10 +724,12 @@ do
                 resetCharacterHitbox(otherPlayer.Character)
             end
         end
+        resetNPCHitboxes()
     end
 
     local function resetAllHitboxes()
         resetEnemyHitboxes()
+        resetNPCHitboxes()
         resetCharacterHitbox(player.Character)
     end
 
@@ -724,6 +762,20 @@ do
 
         if getgenv().HitboxSettings.TeamCheck then
             resetEnemyHitboxes()
+        end
+    end)
+
+    local NPCToggle = Tabs.Script:AddToggle("NPCHitbox_Toggle", {
+        Title = "Target NPCs (Monsters & Bots)",
+        Description = "Expands hitboxes for workspace NPCs and enemy mobs in addition to players.",
+        Default = getgenv().HitboxSettings.TargetNPCs or false
+    })
+
+    NPCToggle:OnChanged(function()
+        getgenv().HitboxSettings.TargetNPCs = Options.NPCHitbox_Toggle.Value
+
+        if not getgenv().HitboxSettings.TargetNPCs then
+            resetNPCHitboxes()
         end
     end)
 
@@ -821,6 +873,31 @@ do
                                 rootPart.CanCollide = false
                             end)
                         end
+                    end
+                end
+            end
+
+            if settings.TargetNPCs then
+                local size = safeHitboxSize(settings.EnemySize)
+                local trans = math.clamp(settings.EnemyTransparency or 0.5, 0, 1)
+                local i = 1
+                while i <= #ActiveNPCs do
+                    local char = ActiveNPCs[i]
+                    if char and char.Parent then
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        local rootPart = getRootPart(char) or (hum and hum.RootPart)
+                        if rootPart and hum and hum.Health > 0 then
+                            pcall(function()
+                                rootPart.Size = Vector3.new(size, size, size)
+                                rootPart.Transparency = trans
+                                rootPart.CanCollide = false
+                            end)
+                            i = i + 1
+                        else
+                            i = i + 1
+                        end
+                    else
+                        table.remove(ActiveNPCs, i)
                     end
                 end
             end
@@ -2860,6 +2937,7 @@ do
         ["Toggle Anti-Fling"] = function() if Options.AntiFling_Toggle then Options.AntiFling_Toggle:SetValue(not Options.AntiFling_Toggle.Value) end end,
         ["Toggle Anti-Void"] = function() if Options.AntiVoid_Toggle then Options.AntiVoid_Toggle:SetValue(not Options.AntiVoid_Toggle.Value) end end,
         ["Toggle Enemy Hitboxes"] = function() if Options.EnemyExpander_Toggle then Options.EnemyExpander_Toggle:SetValue(not Options.EnemyExpander_Toggle.Value) end end,
+        ["Toggle NPC Hitboxes"] = function() if Options.NPCHitbox_Toggle then Options.NPCHitbox_Toggle:SetValue(not Options.NPCHitbox_Toggle.Value) end end,
         ["Rejoin Server"] = function()
             if #Players:GetPlayers() <= 1 then
                 game:GetService("TeleportService"):Teleport(game.PlaceId, Players.LocalPlayer)
