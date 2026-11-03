@@ -5,6 +5,28 @@ local Window = getgenv().Window
 
 getgenv().GameName = "Natural Disaster Survival"
 
+
+if getgenv().update then
+    getgenv().update = nil
+end
+
+getgenv().update = function()
+    local text = [[
+1.0.3 | 2025/9/10
+  * Added disaster notifications in chat
+  * Added anti-teleport & velocity bypass
+  * Added visual cleaners (no fog, no blizzard, no clouds)
+
+1.0.2 | 2025/8/05
+  * Added Jesus mode (water walker) & anti-fling
+  * Added tornado aura controls
+
+1.0.0 | 2025/7/01
+  * Initial release for Natural Disaster Survival
+    ]]
+    return text
+end
+
 if getgenv().ScriptGe then
     getgenv().ScriptGe = nil
 end

@@ -9,6 +9,28 @@ getgenv().SpeedUpgrades = getgenv().SpeedUpgrades or 0.3
 getgenv().SpeedAutoFarmOrbs = getgenv().SpeedAutoFarmOrbs or 0.3
 getgenv().fruitsnumber = getgenv().fruitsnumber or 1
 
+
+if getgenv().update then
+    getgenv().update = nil
+end
+
+getgenv().update = function()
+    local text = [[
+1.0.2 | 2025/9/12
+  * Added auto potion vending machine & crafting
+  * Improved auto orb farm & egg roll speed
+  * Optimized fruit consumption controls
+
+1.0.1 | 2025/8/20
+  * Added auto fish merchants & index shop
+  * Fixed upgrade rolls logic
+
+1.0.0 | 2025/8/01
+  * Initial release for PETS GO
+    ]]
+    return text
+end
+
 if getgenv().ScriptGe then
     getgenv().ScriptGe = nil
 end
@@ -22,7 +44,7 @@ getgenv().ScriptGe = function()
 
 Tabs.Gameworks:AddSection("Auto")
 
-local Slider = Tabs.Gameworks:AddSlider("Slider", {
+local Slider = Tabs.Gameworks:AddSlider("PG_SpeedEggsRoll", {
     Title = "Speed Wait Eggs Roll",
     Description = "Speed Wait to Eggs Roll",
     Default = 0.3, 
@@ -109,7 +131,7 @@ end
 
 
 
-local Slider = Tabs.Gameworks:AddSlider("Slider", {
+local Slider = Tabs.Gameworks:AddSlider("PG_SpeedUpgrades", {
     Title = "Process Upgrades Speed",
     Description = "Increase the speed of process refresh or update rate",    
     Default = 1, 
@@ -274,8 +296,8 @@ startCollectingLoop()
 
     Tabs.Gameworks:AddSection("Farm")
 
-    local Slider = Tabs.Gameworks:AddSlider("Slider", {
-        Title = "Speed Wait Auto Farm Orbs",
+    local Slider = Tabs.Gameworks:AddSlider("PG_SpeedFarmOrbs", {
+    Title = "Speed Wait Auto Farm Orbs",
         Description = "Adjust the speed at which pets switch between targets during auto farming",
         Default = 0.3, 
         Min = 0,    
@@ -761,13 +783,13 @@ end
         Fruit_Watermelon = false,
     })
     
-    local Slider = Tabs.Gameworks:AddSlider("Slider", {
+    local Slider = Tabs.Gameworks:AddSlider("PG_FruitAmount", {
         Title = "Select Amount fruits",
         Description = "Choose the number of fruits to consume",
-        Default = 1, 
-        Min = 1,    
-        Max = 30,  
-        Rounding = 1, 
+        Default = 1,
+        Min = 1,
+        Max = 30,
+        Rounding = 0, 
         Callback = function(Value)
             getgenv().fruitsnumber = math.floor(Value)
         end

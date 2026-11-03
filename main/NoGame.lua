@@ -7,21 +7,46 @@ end
 
 local Fluent = getgenv()._FluentLib
 if not Fluent then
-    Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-    getgenv()._FluentLib = Fluent
+    local ok, lib = pcall(function()
+        return loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+    end)
+    if ok and lib then
+        Fluent = lib
+        getgenv()._FluentLib = Fluent
+    else
+        Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua"))()
+        getgenv()._FluentLib = Fluent
+    end
 end
 getgenv().Fluent = Fluent
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
-local GamePlaceId = game.PlaceId
-local GameName = game:GetService("MarketplaceService"):GetProductInfo(GamePlaceId).Name
+local SaveManager
+local okSave, sm = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+end)
+if okSave and sm then SaveManager = sm end
+
+local InterfaceManager
+local okInt, im = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+end)
+if okInt and im then InterfaceManager = im end
+
+local GamePlaceId = getgenv()._RealPlaceId or game.PlaceId
+getgenv()._RealPlaceId = GamePlaceId
+
+local GameName = "Universal Profile"
+pcall(function()
+    local info = game:GetService("MarketplaceService"):GetProductInfo(GamePlaceId)
+    if info and info.Name then GameName = info.Name end
+end)
+
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
-local playerName = player.Name
-local GameJobId = game.JobId
-local AccountAge = player.AccountAge
-local hasPremium = player.MembershipType == Enum.MembershipType.Premium
+local playerName = player and player.Name or "Player"
+local GameJobId = game.JobId or "Unknown"
+local AccountAge = player and player.AccountAge or 0
+local hasPremium = player and player.MembershipType == Enum.MembershipType.Premium
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -79,7 +104,14 @@ local function parseScriptFileName(fullName)
         return nil
     end
 
-    return mapName, tonumber(mapIdStr), status
+    local cleanStatus = "[Operational]"
+    if status:find("🟠") or status:lower():find("partial") or status:lower():find("orange") then
+        cleanStatus = "[Maintenance]"
+    elseif status:find("🔴") or status:lower():find("patch") or status:lower():find("red") then
+        cleanStatus = "[Investigating]"
+    end
+
+    return mapName, tonumber(mapIdStr), cleanStatus
 end
 
 local Window = Fluent:CreateWindow({
@@ -93,33 +125,20 @@ local Window = Fluent:CreateWindow({
 })
 
 local Tabs
-if getgenv().GameName then
-    Tabs = {
-        Main = Window:AddTab({ Title = "Main", Icon = "info" }),
-        Update = Window:AddTab({ Title = "Update", Icon = "upload" }),
-        Gameworks = Window:AddTab({ Title = getgenv().GameName, Icon = "gamepad-2" }),
-        Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
-        Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
-        Listener = Window:AddTab({ Title = "Listener", Icon = "terminal" }),
-        Executor = Window:AddTab({ Title = "Executor", Icon = "code" }),
-        Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
-        game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
-        Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
-    }
-else
-    Tabs = {
-        Main = Window:AddTab({ Title = "Main", Icon = "info" }),
-        Update = Window:AddTab({ Title = "Update", Icon = "upload" }),
-        Gameworks = Window:AddTab({ Title = "Unknown Game", Icon = "gamepad-2" }),
-        Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
-        Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
-        Listener = Window:AddTab({ Title = "Listener", Icon = "terminal" }),
-        Executor = Window:AddTab({ Title = "Executor", Icon = "code" }),
-        Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
-        game = Window:AddTab({ Title = "Game List", Icon = "usb" }),
-        Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
-    }
-end
+local targetGameTitle = getgenv().GameName or "Unknown Game"
+Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "info" }),
+    Update = Window:AddTab({ Title = "Update", Icon = "history" }),
+    Gameworks = Window:AddTab({ Title = targetGameTitle, Icon = "gamepad-2" }),
+    Script = Window:AddTab({ Title = "Script", Icon = "scroll" }),
+    Universal = Window:AddTab({ Title = "Universal", Icon = "globe" }),
+    Listener = Window:AddTab({ Title = "Listener", Icon = "terminal" }),
+    Executor = Window:AddTab({ Title = "Executor", Icon = "code" }),
+    Debugger = Window:AddTab({ Title = "Debugger", Icon = "bug" }),
+    Games = Window:AddTab({ Title = "Game List", Icon = "layout-grid" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+Tabs.game = Tabs.Games
 
 local Options = Fluent.Options
 getgenv().Tabs = Tabs
@@ -148,6 +167,21 @@ do
     Tabs.Main:AddParagraph({ Title = "Premium Membership Status: " .. (hasPremium and "Active Status" or "Inactive") })
     Tabs.Main:AddParagraph({ Title = "System Initialization Clock: " .. date.day .. "/" .. date.month .. "/" .. date.year .. " " .. hour .. ":" .. min .. ":" .. sec .. " " .. ampm })
     Tabs.Main:AddParagraph({ Title = "Source Provider: https://github.com/tnb1j/script-hub" })
+
+    Tabs.Main:AddSection("Safety & Guidelines")
+    Tabs.Main:AddButton({
+        Title = "View Terms of Service & Disclaimer",
+        Description = "Read the software terms of service, safety guidelines, and open-source license.",
+        Callback = function()
+            Window:Dialog({
+                Title = "Terms of Service & Disclaimer",
+                Content = "English:\n* We hold zero legal liability for account actions or bans sustained while using this script suite.\n* Execution of this framework is undertaken entirely at your own discretion.\n* Fully open-source: https://github.com/tnb1j/script-hub\n\nالعربية:\n* نحن غير مسؤولين عن أي حظر قد يحدث نتيجة استخدام هذا السكربت.\n* استخدام هذا السكربت يكون على مسؤوليتك الشخصية بالكامل.",
+                Buttons = {
+                    { Title = "Understood" }
+                }
+            })
+        end
+    })
 
     -- =====================================
     -- UI: UPDATE BANNER MANAGEMENT
@@ -209,7 +243,7 @@ do
     Tabs.Script:AddSlider("WalkSpeedSlider", {
         Title = "Speed Adjustment (WalkSpeed)",
         Description = "Modifies physical internal workspace speed values.",
-        Default = 16, Min = 0, Max = 500, Rounding = 1,
+        Default = 16, Min = 0, Max = 500, Rounding = 0,
         Callback = function(Value)
             pcall(function() player.Character.Humanoid.WalkSpeed = Value end)
         end
@@ -219,24 +253,16 @@ do
         Title = "Reset Character WalkSpeed",
         Description = "Restores standard engine speed boundaries (16).",
         Callback = function()
-            Window:Dialog({
-                Title = "Confirm Reversion",
-                Content = "Are you sure you want to revert modifications back to structural baseline properties?",
-                Buttons = {
-                    { Title = "Confirm", Callback = function()
-                        pcall(function() player.Character.Humanoid.WalkSpeed = 16 end)
-                        pcall(function() Options.WalkSpeedSlider:SetValue(16) end)
-                    end },
-                    { Title = "Cancel" }
-                }
-            })
+            pcall(function() player.Character.Humanoid.WalkSpeed = 16 end)
+            pcall(function() Options.WalkSpeedSlider:SetValue(16) end)
+            Fluent:Notify({ Title = "Reset", Content = "WalkSpeed restored to 16.", Duration = 2 })
         end
     })
 
     Tabs.Script:AddSlider("JumpPowerSlider", {
         Title = "Velocity Alteration (JumpPower)",
         Description = "Modifies jump engine workspace upward force values.",
-        Default = 50, Min = 0, Max = 500, Rounding = 1,
+        Default = 50, Min = 0, Max = 500, Rounding = 0,
         Callback = function(Value)
             pcall(function() player.Character.Humanoid.JumpPower = Value end)
         end
@@ -246,17 +272,9 @@ do
         Title = "Reset Character JumpPower",
         Description = "Restores standard engine jump boundaries (50).",
         Callback = function()
-            Window:Dialog({
-                Title = "Confirm Reversion",
-                Content = "Are you sure you want to revert physics modifications back to standard engine metrics?",
-                Buttons = {
-                    { Title = "Confirm", Callback = function()
-                        pcall(function() player.Character.Humanoid.JumpPower = 50 end)
-                        pcall(function() Options.JumpPowerSlider:SetValue(50) end)
-                    end },
-                    { Title = "Cancel" }
-                }
-            })
+            pcall(function() player.Character.Humanoid.JumpPower = 50 end)
+            pcall(function() Options.JumpPowerSlider:SetValue(50) end)
+            Fluent:Notify({ Title = "Reset", Content = "JumpPower restored to 50.", Duration = 2 })
         end
     })
 
@@ -281,7 +299,9 @@ do
                 if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
                 pcall(function()
                     for _, p in pairs(player.Character:GetDescendants()) do
-                        if p:IsA("BasePart") then p.CanCollide = true end
+                        if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+                            p.CanCollide = true
+                        end
                     end
                 end)
             end
@@ -290,7 +310,18 @@ do
 
     do
         local flyConn = nil
+        local flySpeed = 60
         local FlyToggle = Tabs.Script:AddToggle("Fly_Toggle", { Title = "Fly Mode (WASD + Space/Shift)", Default = false })
+
+        Tabs.Script:AddSlider("FlySpeedSlider", {
+            Title = "Flight Velocity (Speed)",
+            Description = "Adjusts flight movement velocity (Default: 60).",
+            Default = 60, Min = 10, Max = 300, Rounding = 0,
+            Callback = function(val)
+                flySpeed = val
+            end
+        })
+
         FlyToggle:OnChanged(function()
             local char = player.Character
             if not char then return end
@@ -314,7 +345,7 @@ do
                     if UIS2:IsKeyDown(Enum.KeyCode.D) then mv += cam.CFrame.RightVector end
                     if UIS2:IsKeyDown(Enum.KeyCode.Space) then mv += Vector3.new(0,1,0) end
                     if UIS2:IsKeyDown(Enum.KeyCode.LeftShift) then mv -= Vector3.new(0,1,0) end
-                    bv.Velocity = (mv.Magnitude > 0 and mv.Unit or mv) * 60
+                    bv.Velocity = (mv.Magnitude > 0 and mv.Unit or mv) * flySpeed
                     bg.CFrame = cam.CFrame
                 end)
             else
@@ -324,6 +355,139 @@ do
                     pcall(function() hrp._HubFlyBG:Destroy() end)
                 end
                 if hum then hum.PlatformStand = false end
+            end
+        end)
+    end
+
+    Tabs.Script:AddSlider("CameraFOVSlider", {
+        Title = "Field of View (FOV)",
+        Description = "Adjusts camera field of view (Default: 70).",
+        Default = 70, Min = 30, Max = 120, Rounding = 0,
+        Callback = function(val)
+            pcall(function() workspace.CurrentCamera.FieldOfView = val end)
+        end
+    })
+
+    Tabs.Script:AddButton({
+        Title = "Reset Camera FOV",
+        Description = "Restores standard camera FOV to 70.",
+        Callback = function()
+            pcall(function()
+                workspace.CurrentCamera.FieldOfView = 70
+                if Options.CameraFOVSlider then Options.CameraFOVSlider:SetValue(70) end
+            end)
+            Fluent:Notify({ Title = "Reset", Content = "Camera FOV restored to 70.", Duration = 2 })
+        end
+    })
+
+    do
+        local Lighting = game:GetService("Lighting")
+        local oldBrightness = Lighting.Brightness
+        local oldClockTime = Lighting.ClockTime
+        local oldFogEnd = Lighting.FogEnd
+        local oldGlobalShadows = Lighting.GlobalShadows
+        local fullbrightConn = nil
+
+        Tabs.Script:AddToggle("Fullbright_Toggle", { Title = "Fullbright & Clear Vision", Description = "Removes darkness, shadows, and fog for maximum clarity.", Default = false }):OnChanged(function()
+            if Options.Fullbright_Toggle.Value then
+                oldBrightness = Lighting.Brightness
+                oldClockTime = Lighting.ClockTime
+                oldFogEnd = Lighting.FogEnd
+                oldGlobalShadows = Lighting.GlobalShadows
+
+                fullbrightConn = RunService.RenderStepped:Connect(function()
+                    pcall(function()
+                        Lighting.Brightness = 2
+                        Lighting.ClockTime = 14
+                        Lighting.FogEnd = 1e6
+                        Lighting.GlobalShadows = false
+                    end)
+                end)
+            else
+                if fullbrightConn then fullbrightConn:Disconnect(); fullbrightConn = nil end
+                pcall(function()
+                    Lighting.Brightness = oldBrightness
+                    Lighting.ClockTime = oldClockTime
+                    Lighting.FogEnd = oldFogEnd
+                    Lighting.GlobalShadows = oldGlobalShadows
+                end)
+            end
+        end)
+    end
+
+    do
+        local clickTpConn = nil
+        Tabs.Script:AddToggle("ClickTP_Toggle", { Title = "Click Teleport (Ctrl + Click)", Description = "Hold Ctrl and left click anywhere in the world to teleport.", Default = false }):OnChanged(function()
+            if Options.ClickTP_Toggle.Value then
+                local UIS2 = game:GetService("UserInputService")
+                clickTpConn = UIS2.InputBegan:Connect(function(input, processed)
+                    if processed then return end
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 and (UIS2:IsKeyDown(Enum.KeyCode.LeftControl) or UIS2:IsKeyDown(Enum.KeyCode.RightControl)) then
+                        local mouse = player:GetMouse()
+                        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                        if hrp and mouse and mouse.Hit then
+                            hrp.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+                        end
+                    end
+                end)
+            else
+                if clickTpConn then clickTpConn:Disconnect(); clickTpConn = nil end
+            end
+        end)
+    end
+
+    Tabs.Script:AddButton({
+        Title = "Give Client BTools",
+        Description = "Equips Move, Clone, and Delete tools for local interaction and exploration.",
+        Callback = function()
+            pcall(function()
+                local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack")
+                local tools = {
+                    { Name = "Move Tool", BinType = Enum.BinType.GameTool },
+                    { Name = "Clone Tool", BinType = Enum.BinType.Clone },
+                    { Name = "Delete Tool", BinType = Enum.BinType.Hammer }
+                }
+                for _, t in ipairs(tools) do
+                    local bin = Instance.new("HopperBin")
+                    bin.BinType = t.BinType
+                    bin.Name = t.Name
+                    bin.Parent = backpack
+                end
+            end)
+            Fluent:Notify({ Title = "BTools", Content = "Client building tools added to backpack.", Duration = 3 })
+        end
+    })
+
+    do
+        local antiFlingConn = nil
+        Tabs.Script:AddToggle("AntiFling_Toggle", { Title = "Anti-Fling Protection", Description = "Suppresses erratic physics and flinging attempts by other characters.", Default = false }):OnChanged(function()
+            if Options.AntiFling_Toggle.Value then
+                antiFlingConn = RunService.Stepped:Connect(function()
+                    pcall(function()
+                        local myChar = player.Character
+                        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                        if not myHrp then return end
+                        for _, otherPlr in ipairs(Players:GetPlayers()) do
+                            if otherPlr ~= player and otherPlr.Character then
+                                local otherHrp = otherPlr.Character:FindFirstChild("HumanoidRootPart")
+                                if otherHrp and (otherHrp.Position - myHrp.Position).Magnitude < 25 then
+                                    if otherHrp.AssemblyAngularVelocity.Magnitude > 40 or otherHrp.AssemblyLinearVelocity.Magnitude > 80 then
+                                        otherHrp.AssemblyAngularVelocity = Vector3.zero
+                                        otherHrp.AssemblyLinearVelocity = Vector3.zero
+                                        otherHrp.CanCollide = false
+                                    end
+                                end
+                                for _, part in ipairs(otherPlr.Character:GetDescendants()) do
+                                    if part:IsA("BasePart") then
+                                        part.CanCollide = false
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end)
+            else
+                if antiFlingConn then antiFlingConn:Disconnect(); antiFlingConn = nil end
             end
         end)
     end
@@ -569,7 +733,7 @@ do
         Default = getgenv().HitboxSettings.EnemySize,
         Min = 0,
         Max = 2048,
-        Rounding = 1,
+        Rounding = 0,
         Callback = function(Value)
             getgenv().HitboxSettings.EnemySize = safeHitboxSize(Value)
         end
@@ -608,7 +772,7 @@ do
         Default = getgenv().HitboxSettings.SelfSize,
         Min = 0,
         Max = 2048,
-        Rounding = 1,
+        Rounding = 0,
         Callback = function(Value)
             getgenv().HitboxSettings.SelfSize = safeHitboxSize(Value)
         end
@@ -774,6 +938,59 @@ do
         Description = "Generates and teleports you to a private server in the current game.",
         Callback = function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/tnb1j/script-hub/refs/heads/main/other/Privateserver.lua"))()
+        end
+    })
+
+    Tabs.Universal:AddButton({
+        Title = "Server Hop (Different Public Server)",
+        Description = "Finds and teleports you to an alternate active server for this game.",
+        Callback = function()
+            local TS = game:GetService("TeleportService")
+            local Http = game:GetService("HttpService")
+            local targetPlaceId = getgenv()._RealPlaceId or game.PlaceId
+            local ok, body = pcall(function()
+                return game:HttpGet(string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100", tostring(targetPlaceId)))
+            end)
+            if ok and type(body) == "string" then
+                local s, data = pcall(function() return Http:JSONDecode(body) end)
+                if s and data and data.data then
+                    for _, srv in ipairs(data.data) do
+                        if srv.id ~= game.JobId and srv.playing and srv.maxPlayers and srv.playing < srv.maxPlayers then
+                            Fluent:Notify({ Title = "Teleporting", Content = "Found server with " .. srv.playing .. " players. Teleporting...", Duration = 3 })
+                            TS:TeleportToPlaceInstance(targetPlaceId, srv.id, player)
+                            return
+                        end
+                    end
+                end
+            end
+            Fluent:Notify({ Title = "Server Hop", Content = "No alternate server found. Rejoining...", Duration = 3 })
+            TS:Teleport(targetPlaceId, player)
+        end
+    })
+
+    Tabs.Universal:AddButton({
+        Title = "Hop to Smallest Server",
+        Description = "Teleports to the least populated server available.",
+        Callback = function()
+            local TS = game:GetService("TeleportService")
+            local Http = game:GetService("HttpService")
+            local targetPlaceId = getgenv()._RealPlaceId or game.PlaceId
+            local ok, body = pcall(function()
+                return game:HttpGet(string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100", tostring(targetPlaceId)))
+            end)
+            if ok and type(body) == "string" then
+                local s, data = pcall(function() return Http:JSONDecode(body) end)
+                if s and data and data.data then
+                    for _, srv in ipairs(data.data) do
+                        if srv.id ~= game.JobId and srv.playing and srv.playing > 0 and srv.playing < srv.maxPlayers then
+                            Fluent:Notify({ Title = "Teleporting", Content = "Smallest server found (" .. srv.playing .. " players). Teleporting...", Duration = 3 })
+                            TS:TeleportToPlaceInstance(targetPlaceId, srv.id, player)
+                            return
+                        end
+                    end
+                end
+            end
+            Fluent:Notify({ Title = "Notice", Content = "No small servers available.", Duration = 3 })
         end
     })
 
@@ -1220,7 +1437,7 @@ do
         if not targetGuiParent then targetGuiParent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end
 
         customScreenGui = Instance.new("ScreenGui")
-        customScreenGui.Name = "XenoExecutorStandalone"
+        customScreenGui.Name = "GokuExecutorStandalone"
         customScreenGui.ResetOnSpawn = false
         customScreenGui.DisplayOrder = 100
         customScreenGui.Parent = targetGuiParent
@@ -1238,7 +1455,7 @@ do
         stroke.Color = Color3.fromRGB(40, 40, 40)
         stroke.Thickness = 1
         
-        -- Xeno Header
+        -- Studio Header
         local Header = Instance.new("Frame")
         Header.Size = UDim2.new(1, 0, 0, 30)
         Header.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
@@ -1258,7 +1475,7 @@ do
         Title.Size = UDim2.new(1, -150, 1, 0)
         Title.Position = UDim2.new(0, 35, 0, 0)
         Title.BackgroundTransparency = 1
-        Title.Text = "Xeno <font color='#3498db'>v1.3.40</font> <font color='#555'>https://xeno.now</font>"
+        Title.Text = "gokuthug1 Hub <font color='#00ff96'>Studio</font> <font color='#888'>Script Executor</font>"
         Title.RichText = true
         Title.TextColor3 = Color3.fromRGB(255, 255, 255)
         Title.Font = Enum.Font.GothamMedium
@@ -2556,13 +2773,23 @@ do
     -- =====================================
     -- UI: REMOTE DIRECTORY NETWORK EXPLORER
     -- =====================================
-    Tabs.game:AddSection("Supported Architecture Ecosystem")
-    Tabs.game:AddParagraph({
+    local targetGameTab = Tabs.Games or Tabs.game
+    targetGameTab:AddSection("Supported Architecture Ecosystem")
+    targetGameTab:AddParagraph({
         Title = "Status Level Legend Indices",
-        Content = "🟢 Fully Functional: Complete architectural profile script adaptation.\n🟠 Partially Functional: Legacy build layout; features could run inconsistently.\n🔴 Non-Functional: Patched structural security layout limits exploitation."
+        Content = "[Operational] Fully Functional: Complete game profile adaptation.\n[Maintenance] Partially Functional: Profile undergoing maintenance or testing.\n[Investigating] Patched: Security patch limits or restricts exploitation."
     })
 
-    -- Dynamically requests content lists from repository with fallback to cached static registry
+    local STATIC_GAME_FALLBACK = {
+        [101949297449238] = { name = "Build An Island", status = "[Operational]" },
+        [6447798030]        = { name = "Funky Friday", status = "[Operational]" },
+        [189707]            = { name = "Natural Disaster Survival", status = "[Operational]" },
+        [18901165922]       = { name = "PETS GO", status = "[Maintenance]" },
+        [98228431199658]  = { name = "Raft Survival", status = "[Operational]" },
+        [4972273297]        = { name = "Regretevator", status = "[Operational]" },
+        [11379739543]       = { name = "Timebomb Duels", status = "[Operational]" }
+    }
+
     local gamesList = {}
     local map_success, map_response = httpGet(SCRIPT_DIRECTORY_URL)
     
@@ -2583,13 +2810,13 @@ do
         end
     end
 
-    -- Fallback to static cached registry if API is rate-limited (HTTP 403) or offline
-    if #gamesList == 0 and getgenv()._GokuGameRegistry then
-        for placeId, info in pairs(getgenv()._GokuGameRegistry) do
+    if #gamesList == 0 then
+        local sourceReg = getgenv()._GokuGameRegistry or STATIC_GAME_FALLBACK
+        for placeId, info in pairs(sourceReg) do
             table.insert(gamesList, {
                 name = info.name or "Game",
                 id = placeId,
-                status = info.status or "🟢"
+                status = info.status or "[Operational]"
             })
         end
     end
@@ -2597,13 +2824,18 @@ do
     table.sort(gamesList, function(a, b) return a.name < b.name end)
 
     for _, g in ipairs(gamesList) do
-        Tabs.game:AddButton({
-            Title = g.name .. " [" .. g.status .. "]",
+        local badge = g.status
+        if badge == "🟢" then badge = "[Operational]" end
+        if badge == "🟠" then badge = "[Maintenance]" end
+        if badge == "🔴" then badge = "[Investigating]" end
+
+        targetGameTab:AddButton({
+            Title = g.name .. " " .. badge,
             Description = "Target Universe Routing Sequence ID: " .. tostring(g.id),
             Callback = function()
                 Window:Dialog({
-                    Title = "Initialize Crossroads Cross-Teleportation",
-                    Content = "Initiating global teleport protocol query straight toward: " .. g.name,
+                    Title = "Confirm Teleportation",
+                    Content = "Initiating teleportation sequence to: " .. g.name,
                     Buttons = {
                         { Title = "Confirm", Callback = function() game:GetService("TeleportService"):Teleport(g.id, player) end },
                         { Title = "Cancel" }
@@ -2623,6 +2855,9 @@ do
         ["Toggle Noclip"] = function() if Options.Noclip_Toggle then Options.Noclip_Toggle:SetValue(not Options.Noclip_Toggle.Value) end end,
         ["Toggle God Mode"] = function() if Options.GodMode_Toggle then Options.GodMode_Toggle:SetValue(not Options.GodMode_Toggle.Value) end end,
         ["Toggle Infinite Jump"] = function() if Options.InfJump_Toggle then Options.InfJump_Toggle:SetValue(not Options.InfJump_Toggle.Value) end end,
+        ["Toggle Fullbright"] = function() if Options.Fullbright_Toggle then Options.Fullbright_Toggle:SetValue(not Options.Fullbright_Toggle.Value) end end,
+        ["Toggle Click TP"] = function() if Options.ClickTP_Toggle then Options.ClickTP_Toggle:SetValue(not Options.ClickTP_Toggle.Value) end end,
+        ["Toggle Anti-Fling"] = function() if Options.AntiFling_Toggle then Options.AntiFling_Toggle:SetValue(not Options.AntiFling_Toggle.Value) end end,
         ["Toggle Anti-Void"] = function() if Options.AntiVoid_Toggle then Options.AntiVoid_Toggle:SetValue(not Options.AntiVoid_Toggle.Value) end end,
         ["Toggle Enemy Hitboxes"] = function() if Options.EnemyExpander_Toggle then Options.EnemyExpander_Toggle:SetValue(not Options.EnemyExpander_Toggle.Value) end end,
         ["Rejoin Server"] = function()

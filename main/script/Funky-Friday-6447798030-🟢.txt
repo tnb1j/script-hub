@@ -5,6 +5,28 @@ local Window = getgenv().Window
 
 getgenv().GameName = "Funky Friday"
 
+
+if getgenv().update then
+    getgenv().update = nil
+end
+
+getgenv().update = function()
+    local text = [[
+1.0.2 | 2025/8/15
+  * Improved note hit accuracy & timing buffer
+  * Added perfect sick timing mode
+  * Added simple arrow style option
+
+1.0.1 | 2025/7/20
+  * Added autoplay calculation & rapid modes
+  * Fixed hold duration offset
+
+1.0.0 | 2025/7/01
+  * Initial release for Funky Friday
+    ]]
+    return text
+end
+
 if getgenv().ScriptGe then
     getgenv().ScriptGe = nil
 end

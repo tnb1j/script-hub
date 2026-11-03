@@ -964,7 +964,7 @@ activateButtonsInPath()
         Description = "Set the health level that will be considered dangerous",
         Default = 50,
         Min = 1,
-        Max = 50,
+        Max = 100,
         Rounding = 0,
         Callback = function(Value)
             getgenv().HealthThreshold = Value

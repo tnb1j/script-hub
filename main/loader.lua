@@ -5,6 +5,9 @@ if getgenv().Window then
     getgenv().Window = nil
 end
 
+local PlaceId = getgenv()._RealPlaceId or game.PlaceId
+getgenv()._RealPlaceId = PlaceId
+
 local Fluent = getgenv()._FluentLib
 if not Fluent then
     local ok, lib = pcall(function()
@@ -21,7 +24,6 @@ end
 getgenv().Fluent = Fluent
 
 local HttpService = game:GetService("HttpService")
-local PlaceId = game.PlaceId
 local Request = request or http_request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request)
 
 local REPO_OWNER = "tnb1j"
@@ -32,15 +34,14 @@ local RAW_BASE_URL = ("https://raw.githubusercontent.com/%s/%s/%s"):format(REPO_
 local DIRECTORY_URL = ("https://api.github.com/repos/%s/%s/contents/main/script?ref=%s"):format(REPO_OWNER, REPO_NAME, REPO_BRANCH)
 local UNIVERSAL_SCRIPT_URL = RAW_BASE_URL .. "/main/NoGame.lua"
 
--- Static game catalog ensuring full functionality even when GitHub API rate-limits (HTTP 403)
 local STATIC_GAME_REGISTRY = {
-    [101949297449238] = { name = "Build An Island", file = "Build-An-Island-101949297449238-🟢.txt", status = "🟢" },
-    [6447798030]        = { name = "Funky Friday", file = "Funky-Friday-6447798030-🟢.txt", status = "🟢" },
-    [189707]            = { name = "Natural Disaster Survival", file = "Natural-Disaster-Survival-189707-🟢.txt", status = "🟢" },
-    [18901165922]       = { name = "PETS GO", file = "PETS-GO-18901165922-🟠.txt", status = "🟠" },
-    [98228431199658]  = { name = "Raft Survival", file = "Raft-Survival-98228431199658-🟢.txt", status = "🟢" },
-    [4972273297]        = { name = "Regretevator", file = "Regretevator-4972273297-🟢.txt", status = "🟢" },
-    [11379739543]       = { name = "Timebomb Duels", file = "Timebomb-Duels-11379739543-🟢.txt", status = "🟢" }
+    [101949297449238] = { name = "Build An Island", file = "Build-An-Island-101949297449238-🟢.txt", status = "[Operational]" },
+    [6447798030]        = { name = "Funky Friday", file = "Funky-Friday-6447798030-🟢.txt", status = "[Operational]" },
+    [189707]            = { name = "Natural Disaster Survival", file = "Natural-Disaster-Survival-189707-🟢.txt", status = "[Operational]" },
+    [18901165922]       = { name = "PETS GO", file = "PETS-GO-18901165922-🟠.txt", status = "[Maintenance]" },
+    [98228431199658]  = { name = "Raft Survival", file = "Raft-Survival-98228431199658-🟢.txt", status = "[Operational]" },
+    [4972273297]        = { name = "Regretevator", file = "Regretevator-4972273297-🟢.txt", status = "[Operational]" },
+    [11379739543]       = { name = "Timebomb Duels", file = "Timebomb-Duels-11379739543-🟢.txt", status = "[Operational]" }
 }
 getgenv()._GokuGameRegistry = STATIC_GAME_REGISTRY
 
@@ -49,7 +50,7 @@ local function notify(content, duration)
         Fluent:Notify({
             Title = "gokuthug1's Script Hub",
             Content = content,
-            Duration = duration or 6
+            Duration = duration or 5
         })
     end)
 end
@@ -157,7 +158,14 @@ local function parseScriptFileName(fullName)
         return nil
     end
 
-    return mapName, tonumber(mapIdStr), status
+    local cleanStatus = "[Operational]"
+    if status:find("🟠") or status:lower():find("partial") or status:lower():find("orange") then
+        cleanStatus = "[Maintenance]"
+    elseif status:find("🔴") or status:lower():find("patch") or status:lower():find("red") then
+        cleanStatus = "[Investigating]"
+    end
+
+    return mapName, tonumber(mapIdStr), cleanStatus
 end
 
 local targetGameFile = nil
@@ -178,7 +186,7 @@ if success and not looksLikeHtml(responseBody) then
                     STATIC_GAME_REGISTRY[mapId] = {
                         name = mapName,
                         file = file.name,
-                        status = status or "🟢",
+                        status = status,
                         download_url = file.download_url
                     }
                     if PlaceId == mapId then
@@ -201,7 +209,7 @@ end
 -- Launch the targeted profile or universal fallback
 if targetGameFile and targetGameName then
     print("[gokuthug1's Hub] Loading game profile: " .. targetGameName)
-    notify("Executing dynamic profile for: " .. targetGameName, 5)
+    notify("Executing profile: " .. targetGameName, 4)
 
     if loadRemoteScript(targetGameFile, targetGameName) then
         if not loadRemoteScript(UNIVERSAL_SCRIPT_URL, "hub shell") then
@@ -214,6 +222,6 @@ if targetGameFile and targetGameName then
         loadRemoteScript(UNIVERSAL_SCRIPT_URL, "universal profile")
     end
 else
-    notify("Universal profile applied successfully.", 5)
+    notify("Universal profile loaded.", 4)
     loadRemoteScript(UNIVERSAL_SCRIPT_URL, "universal profile")
 end

@@ -40,7 +40,7 @@ end
 
 safeBootstrap(BOOTSTRAP_URL, "main loader")
 
-return {
+local Terms = {
     Configuration = {
         {
             title = "Warning",
@@ -70,3 +70,6 @@ return {
         }
     }
 }
+
+getgenv()._GokuTermsOfService = Terms
+return Terms

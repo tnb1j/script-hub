@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+getgenv()._RealPlaceId = getgenv()._RealPlaceId or game.PlaceId
+
 getgenv().IdentityConfig = getgenv().IdentityConfig or {
     FakeName = "???",
     FakeUserId = 1,
@@ -23,57 +25,102 @@ end
 
 savedData.changedLocations = savedData.changedLocations or {}
 
+local hookInstalled = false
+local oldIndex = nil
+local oldNamecall = nil
+
 pcall(function()
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
+    if hookmetamethod and newcclosure then
+        oldIndex = hookmetamethod(game, "__index", newcclosure(function(obj, key)
+            if obj == game and key == "JobId" then
+                return getgenv().IdentityConfig.FakeJobId
+            end
+            if obj == game and key == "PlaceId" then
+                return getgenv().IdentityConfig.FakePlaceId
+            end
+            if obj == game and key == "Name" then
+                return getgenv().IdentityConfig.FakeGameName
+            end
+            if obj == Players.LocalPlayer then
+                if key == "MembershipType" then
+                    return getgenv().IdentityConfig.FakePremium and Enum.MembershipType.Premium or Enum.MembershipType.None
+                end
+                if key == "Name" or key == "DisplayName" then
+                    return getgenv().IdentityConfig.FakeName
+                end
+                if key == "UserId" then
+                    return getgenv().IdentityConfig.FakeUserId
+                end
+            end
+            return oldIndex(obj, key)
+        end))
 
-    local oldIndex = mt.__index
-    mt.__index = function(obj, key)
-        if obj == game and key == "JobId" then
-            return getgenv().IdentityConfig.FakeJobId
-        end
-        if obj == game and key == "PlaceId" then
-            return getgenv().IdentityConfig.FakePlaceId
-        end
-        if obj == game and key == "Name" then
-            return getgenv().IdentityConfig.FakeGameName
-        end
-        if (obj == Players.LocalPlayer or (typeof(obj) == "Instance" and obj:IsA("Player") and obj == Players.LocalPlayer)) then
-            if key == "MembershipType" then
-                return getgenv().IdentityConfig.FakePremium and Enum.MembershipType.Premium or Enum.MembershipType.None
+        oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if method == "GetClientId" and tostring(self) == "RbxAnalyticsService" then
+                return getgenv().IdentityConfig.FakeHWID
             end
-            if key == "Name" or key == "DisplayName" then
-                return getgenv().IdentityConfig.FakeName
-            end
-            if key == "UserId" then
-                return getgenv().IdentityConfig.FakeUserId
-            end
-        end
-        return oldIndex(obj, key)
-    end
+            return oldNamecall(self, ...)
+        end))
+        hookInstalled = true
+    else
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
 
-    local oldNamecall = mt.__namecall
-    mt.__namecall = function(self, ...)
-        local method = getnamecallmethod()
-        if method == "GetClientId" and tostring(self) == "RbxAnalyticsService" then
-            return getgenv().IdentityConfig.FakeHWID
+        oldIndex = mt.__index
+        mt.__index = function(obj, key)
+            if obj == game and key == "JobId" then
+                return getgenv().IdentityConfig.FakeJobId
+            end
+            if obj == game and key == "PlaceId" then
+                return getgenv().IdentityConfig.FakePlaceId
+            end
+            if obj == game and key == "Name" then
+                return getgenv().IdentityConfig.FakeGameName
+            end
+            if obj == Players.LocalPlayer then
+                if key == "MembershipType" then
+                    return getgenv().IdentityConfig.FakePremium and Enum.MembershipType.Premium or Enum.MembershipType.None
+                end
+                if key == "Name" or key == "DisplayName" then
+                    return getgenv().IdentityConfig.FakeName
+                end
+                if key == "UserId" then
+                    return getgenv().IdentityConfig.FakeUserId
+                end
+            end
+            return oldIndex(obj, key)
         end
-        return oldNamecall(self, ...)
+
+        oldNamecall = mt.__namecall
+        mt.__namecall = function(self, ...)
+            local method = getnamecallmethod()
+            if method == "GetClientId" and tostring(self) == "RbxAnalyticsService" then
+                return getgenv().IdentityConfig.FakeHWID
+            end
+            return oldNamecall(self, ...)
+        end
+
+        setreadonly(mt, true)
+        hookInstalled = true
     end
 end)
 
 local function isLocationChanged(object, property)
-    local fullName = object:GetFullName() .. "." .. property
-    return savedData.changedLocations[fullName] == true
+    local ok, fullName = pcall(function() return object:GetFullName() .. "." .. property end)
+    return ok and savedData.changedLocations[fullName] == true
 end
 
 local function markLocationChanged(object, property)
-    local fullName = object:GetFullName() .. "." .. property
-    savedData.changedLocations[fullName] = true
+    local ok, fullName = pcall(function() return object:GetFullName() .. "." .. property end)
+    if ok then
+        savedData.changedLocations[fullName] = true
+    end
 end
 
 local function applyPlayerChanges()
     local localPlayer = Players.LocalPlayer
+    if not localPlayer then return end
 
     pcall(function()
         if localPlayer.Name == savedData.originalName and not isLocationChanged(localPlayer, "Name") then
@@ -98,21 +145,27 @@ local function applyPlayerChanges()
 end
 
 local function updateWorkspaceNames(object)
-    for _, child in pairs(object:GetChildren()) do
-        if child.Name == savedData.originalName and not isLocationChanged(child, "Name") then
-            child.Name = getgenv().IdentityConfig.FakeName
-            markLocationChanged(child, "Name")
-        end
+    if not object then return end
+    local ok, children = pcall(function() return object:GetChildren() end)
+    if not ok or not children then return end
 
-        if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-            if child.Text == savedData.originalName and not isLocationChanged(child, "Text") then
-                child.Text = getgenv().IdentityConfig.FakeName
-                markLocationChanged(child, "Text")
-            elseif child.Text == savedData.originalDisplayName and not isLocationChanged(child, "Text") then
-                child.Text = getgenv().IdentityConfig.FakeName
-                markLocationChanged(child, "Text")
+    for _, child in pairs(children) do
+        pcall(function()
+            if child.Name == savedData.originalName and not isLocationChanged(child, "Name") then
+                child.Name = getgenv().IdentityConfig.FakeName
+                markLocationChanged(child, "Name")
             end
-        end
+
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                if child.Text == savedData.originalName and not isLocationChanged(child, "Text") then
+                    child.Text = getgenv().IdentityConfig.FakeName
+                    markLocationChanged(child, "Text")
+                elseif child.Text == savedData.originalDisplayName and not isLocationChanged(child, "Text") then
+                    child.Text = getgenv().IdentityConfig.FakeName
+                    markLocationChanged(child, "Text")
+                end
+            end
+        end)
         updateWorkspaceNames(child)
     end
 end
@@ -149,11 +202,13 @@ local function setupMonitoring()
         updateWorkspaceNames(child)
     end)
 
-    local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-    playerGui.ChildAdded:Connect(function(child)
-        task.wait(0.1)
-        updateWorkspaceNames(child)
-    end)
+    local playerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if playerGui then
+        playerGui.ChildAdded:Connect(function(child)
+            task.wait(0.1)
+            updateWorkspaceNames(child)
+        end)
+    end
 
     pcall(function()
         local coreGui = game:GetService("CoreGui")
@@ -161,13 +216,6 @@ local function setupMonitoring()
             task.wait(0.1)
             updateWorkspaceNames(child)
         end)
-
-        for _, gui in pairs(coreGui:GetChildren()) do
-            gui.ChildAdded:Connect(function(newChild)
-                task.wait(0.1)
-                updateWorkspaceNames(newChild)
-            end)
-        end
     end)
 
     Players.LocalPlayer.Changed:Connect(function(property)
@@ -180,7 +228,7 @@ end
 
 local function startContinuousLoop()
     task.spawn(function()
-        while true do
+        while getgenv().IdentityHiderActive ~= false do
             task.wait(2)
             applyPlayerChanges()
             pcall(function() updateWorkspaceNames(workspace) end)
@@ -190,15 +238,17 @@ local function startContinuousLoop()
     end)
 end
 
+getgenv().IdentityHiderActive = true
 applyAllChanges()
 setupMonitoring()
 startContinuousLoop()
 
 getgenv().restoreIdentity = function()
+    getgenv().IdentityHiderActive = false
     local localPlayer = Players.LocalPlayer
-    localPlayer.Name = savedData.originalName
-    localPlayer.DisplayName = savedData.originalDisplayName
-    pcall(function()
-        localPlayer.UserId = savedData.originalUserId
-    end)
+    if localPlayer then
+        pcall(function() localPlayer.Name = savedData.originalName end)
+        pcall(function() localPlayer.DisplayName = savedData.originalDisplayName end)
+        pcall(function() localPlayer.UserId = savedData.originalUserId end)
+    end
 end

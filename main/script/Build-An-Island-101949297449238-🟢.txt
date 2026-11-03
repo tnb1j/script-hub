@@ -45,7 +45,7 @@ getgenv().ScriptGe = function()
 
 Tabs.Gameworks:AddSection("Auto")
 
-local Slider = Tabs.Gameworks:AddSlider("Slider", {
+local Slider = Tabs.Gameworks:AddSlider("BAI_SpeedHitResource", {
     Title = "Speed Wait Hit Resource/Contribute",
     Description = "Speed Wait to Hit Resource/Contribute To Expand",
     Default = 0.3, 
@@ -714,12 +714,12 @@ end)
 
 Tabs.Gameworks:AddSection("Fish")
 
-local Slider = Tabs.Gameworks:AddSlider("Slider", {
+local Slider = Tabs.Gameworks:AddSlider("BAI_FishRepeat", {
     Title = "double Fish repeat",
-    Default = 1, 
-    Min = 1,    
-    Max = 100,  
-    Rounding = 1, 
+    Default = 1,
+    Min = 1,
+    Max = 100,
+    Rounding = 0, 
     Callback = function(Value)
         getgenv().SpeedAutodoubleFishrepeat = Value
     end

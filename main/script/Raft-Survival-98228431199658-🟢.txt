@@ -29,7 +29,7 @@ getgenv().ScriptGe = function()
     local Window = getgenv().Window
     if not Tabs or not Tabs.Gameworks then return end
 
-local Slider = Tabs.Gameworks:AddSlider("Slider", {
+local Slider = Tabs.Gameworks:AddSlider("RS_AutoSpeed", {
     Title = "Auto speed adjustment",
     Description = "Auto speed adjustment (All of them)",
     Default = 0.3, 
